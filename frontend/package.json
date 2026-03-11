@@ -9,19 +9,19 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "14.2.35",
-    "react": "^18",
-    "react-dom": "^18",
+    "next": "15.5.12",
+    "react": "^19",
+    "react-dom": "^19",
     "plotly.js": "^2.32.0",
     "react-plotly.js": "^2.6.0",
     "axios": "^1.6.8",
     "uuid": "^9.0.1",
-    "lucide-react": "^0.378.0"
+    "lucide-react": "^0.577.0"
   },
   "devDependencies": {
     "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "@types/react-plotly.js": "^2.6.3",
     "@types/uuid": "^9.0.8",
     "autoprefixer": "^10.0.1",
