@@ -277,7 +277,7 @@ Get the schema and sample data for the current/session dataset.
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | Next.js 14, React 18, TypeScript, Tailwind CSS |
+| **Frontend** | Next.js 15, React 19, TypeScript, Tailwind CSS |
 | **Charts** | Plotly.js / react-plotly.js |
 | **Backend** | Python FastAPI, Uvicorn |
 | **LLM** | Google Gemini 1.5 Flash |

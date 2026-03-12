@@ -115,7 +115,25 @@ def _get_mock_response(user_query: str) -> dict:
     """Return a mock response when no API key is configured."""
     query_lower = user_query.lower()
 
-    if any(word in query_lower for word in ["month", "trend", "time", "revenue over"]):
+    if any(word in query_lower for word in ["top", "best", "highest", "most sold", "most revenue"]):
+        return {
+            "charts": [
+                {
+                    "chart_type": "bar",
+                    "title": "Top 5 Product Categories by Revenue",
+                    "sql": "SELECT product_category, ROUND(SUM(total_revenue), 2) AS total_revenue FROM sales_data GROUP BY product_category ORDER BY total_revenue DESC LIMIT 5",
+                    "x_column": "product_category",
+                    "y_column": "total_revenue",
+                    "color_column": None,
+                    "labels_column": None,
+                    "values_column": None,
+                    "description": "Top 5 product categories ranked by total revenue"
+                }
+            ],
+            "insights": "This chart highlights the top-performing product categories by total revenue. Electronics and Fashion typically dominate, driven by higher unit prices and strong demand.",
+            "error": None
+        }
+    elif any(word in query_lower for word in ["month", "trend", "time", "revenue over"]):
         return {
             "charts": [
                 {
