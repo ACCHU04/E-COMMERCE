@@ -47,6 +47,11 @@ const DARK_LAYOUT: Partial<Plotly.Layout> = {
 };
 
 export function ChartRenderer({ chart }: ChartRendererProps) {
+  const isCurrencyMetric = useMemo(() => {
+    const candidate = (chart.y_column || chart.values_column || "").toLowerCase();
+    return /(revenue|sales|amount|price|cost|gmv|profit)/i.test(candidate);
+  }, [chart]);
+
   const reasoning = useMemo(() => {
     const x = chart.x_column || chart.labels_column || "dimension";
     const y = chart.y_column || chart.values_column || "metric";
@@ -95,6 +100,9 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
             y: filtered.map((d) => d[y_column!]),
             line: { color: CHART_COLORS[idx % CHART_COLORS.length], width: 2 },
             marker: { size: 5 },
+            hovertemplate: isCurrencyMetric
+              ? `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`
+              : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`,
           } as Plotly.Data;
         });
       } else {
@@ -108,10 +116,21 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
             marker: { size: 6, color: CHART_COLORS[0] },
             fill: "tozeroy",
             fillcolor: "rgba(59,130,246,0.08)",
+            hovertemplate: isCurrencyMetric
+              ? `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`
+              : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`,
           } as Plotly.Data,
         ];
       }
-      layout = { ...layout, xaxis: { ...DARK_LAYOUT.xaxis, title: { text: x_column ?? "", font: { color: "#64748b" } } }, yaxis: { ...DARK_LAYOUT.yaxis, title: { text: y_column ?? "", font: { color: "#64748b" } } } };
+      layout = {
+        ...layout,
+        xaxis: {
+          ...DARK_LAYOUT.xaxis,
+          title: { text: x_column ?? "", font: { color: "#64748b" } },
+          rangeslider: { visible: true, bgcolor: "rgba(30,41,59,0.6)", bordercolor: "#334155" },
+        },
+        yaxis: { ...DARK_LAYOUT.yaxis, title: { text: y_column ?? "", font: { color: "#64748b" } } },
+      };
 
     } else if (chart_type === "bar") {
       if (color_column) {
@@ -124,6 +143,9 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
             x: filtered.map((d) => d[x_column!]),
             y: filtered.map((d) => d[y_column!]),
             marker: { color: CHART_COLORS[idx % CHART_COLORS.length] },
+            hovertemplate: isCurrencyMetric
+              ? `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`
+              : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`,
           } as Plotly.Data;
         });
         layout = { ...layout, barmode: "group" };
@@ -137,6 +159,11 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
               color: CHART_COLORS,
               opacity: 0.85,
             },
+            selected: { marker: { opacity: 1 } },
+            unselected: { marker: { opacity: 0.45 } },
+            hovertemplate: isCurrencyMetric
+              ? `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`
+              : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`,
           } as Plotly.Data,
         ];
       }
@@ -154,7 +181,9 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
           textinfo: "label+percent",
           textfont: { color: "#e2e8f0", size: 11 },
           hole: 0.35,
-          hovertemplate: "<b>%{label}</b><br>Value: %{value:,.2f}<br>Share: %{percent}<extra></extra>",
+          hovertemplate: isCurrencyMetric
+            ? "<b>%{label}</b><br>Value: $%{value:,.2f}<br>Share: %{percent}<extra></extra>"
+            : "<b>%{label}</b><br>Value: %{value:,.2f}<br>Share: %{percent}<extra></extra>",
         } as Plotly.Data,
       ];
       layout = { ...layout, showlegend: true };
@@ -172,14 +201,16 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
             opacity: 0.75,
           },
           text: color_column ? data.map((d) => String(d[color_column])) : undefined,
-          hovertemplate: `<b>${x_column}: %{x}</b><br>${y_column}: %{y}<extra></extra>`,
+          hovertemplate: isCurrencyMetric
+            ? `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`
+            : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`,
         } as Plotly.Data,
       ];
       layout = { ...layout, xaxis: { ...DARK_LAYOUT.xaxis, title: { text: x_column ?? "", font: { color: "#64748b" } } }, yaxis: { ...DARK_LAYOUT.yaxis, title: { text: y_column ?? "", font: { color: "#64748b" } } } };
     }
 
     return { plotData, layout };
-  }, [chart]);
+  }, [chart, isCurrencyMetric]);
 
   return (
     <div className="w-full">
@@ -194,6 +225,7 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
             format: "svg",
             filename: chart.title.replace(/\s+/g, "_"),
           },
+          scrollZoom: true,
         }}
         style={{ width: "100%", minHeight: 320 }}
         useResizeHandler
