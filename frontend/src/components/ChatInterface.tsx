@@ -40,6 +40,8 @@ export function ChatInterface({
   const [autoSendVoice, setAutoSendVoice] = useState(true);
   const [ttsSupported, setTtsSupported] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  const [streamingText, setStreamingText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const speechBaseInputRef = useRef("");
@@ -48,10 +50,50 @@ export function ChatInterface({
   const onSendRef = useRef(onSendMessage);
   const speechFinalRef = useRef("");
   const lastSpokenMessageIdRef = useRef<string | null>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastAnimatedAssistantIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    const latestAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant" && !!m.content?.trim());
+
+    if (!latestAssistant) return;
+    if (lastAnimatedAssistantIdRef.current === latestAssistant.id) return;
+
+    if (typingTimerRef.current) {
+      clearInterval(typingTimerRef.current);
+    }
+
+    lastAnimatedAssistantIdRef.current = latestAssistant.id;
+    setStreamingMessageId(latestAssistant.id);
+    setStreamingText("");
+
+    const fullText = latestAssistant.content;
+    let idx = 0;
+
+    typingTimerRef.current = setInterval(() => {
+      idx = Math.min(fullText.length, idx + 3);
+      setStreamingText(fullText.slice(0, idx));
+
+      if (idx >= fullText.length && typingTimerRef.current) {
+        clearInterval(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+    }, 18);
+  }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) {
+        clearInterval(typingTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     latestInputRef.current = input;
@@ -236,6 +278,12 @@ export function ChatInterface({
                 key={msg.id}
                 className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
               >
+                {(() => {
+                  const isStreamingMessage = msg.role === "assistant" && streamingMessageId === msg.id;
+                  const renderedContent = isStreamingMessage ? streamingText : msg.content;
+
+                  return (
+                    <>
                 <div
                   className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs ${
                     msg.role === "user"
@@ -258,7 +306,10 @@ export function ChatInterface({
                       : "bg-slate-900/85 border border-white/10 text-slate-100 rounded-tl-sm"
                   }`}
                 >
-                  <p>{msg.content}</p>
+                  <p>{renderedContent}</p>
+                  {isStreamingMessage && renderedContent.length < msg.content.length && (
+                    <span className="inline-block w-1.5 h-4 ml-1 align-middle bg-violet-300/80 animate-pulse rounded-sm" />
+                  )}
                   {msg.clarification_needed && msg.clarification_question && (
                     <div className="mt-2 space-y-2">
                       <p className="text-xs text-amber-300">{msg.clarification_question}</p>
@@ -295,6 +346,9 @@ export function ChatInterface({
                     </button>
                   )}
                 </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
             {isLoading && (
