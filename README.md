@@ -1,101 +1,51 @@
-# 🤖 AI Dashboard — Conversational BI for E-Commerce
+# AI Dashboard - Conversational BI for E-Commerce
 
-> Turn natural language questions into interactive data dashboards instantly — no SQL or BI tool knowledge required.
+Turn natural-language questions into interactive dashboards, insights, and exports in seconds.
 
----
+## What Is Included
 
-## 🏗️ Architecture
+- Conversational analytics with follow-up questions
+- Interactive Plotly charts (bar, line, pie, scatter)
+- Smart clarification flow when a query is ambiguous
+- Query planning + confidence indicators
+- Executive summary cards for decision-making
+- Upload support for CSV, JSON, XLSX/XLS
+- Session-aware query history and replay
+- Multi-view frontend workspace (Overview, Analytics, Reports, History, Settings)
+- Real PDF export from dashboard views (jsPDF + html2canvas)
+- JSON and CSV export options from dashboard/session data
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     USER BROWSER                            │
-│  ┌─────────────────────┐   ┌─────────────────────────────┐  │
-│  │   Chat Interface    │   │    Interactive Dashboard    │  │
-│  │  (natural language) │   │   (Plotly charts + insight) │  │
-│  └──────────┬──────────┘   └──────────────┬──────────────┘  │
-│             │   Next.js + Tailwind CSS     │                 │
-└─────────────┼─────────────────────────────┼─────────────────┘
-              │ REST API                     │ JSON response
-              ▼                             ▲
-┌─────────────────────────────────────────────────────────────┐
-│                   FASTAPI BACKEND                           │
-│                                                             │
-│  ┌──────────────┐   ┌───────────────┐   ┌───────────────┐  │
-│  │  LLM Service │   │  SQL Validator│   │Chart Recommender│ │
-│  │ (Gemini API) │   │(query_parser) │   │(chart_recommender)│
-│  └──────┬───────┘   └───────┬───────┘   └───────────────┘  │
-│         │                   │                               │
-│  ┌──────▼───────────────────▼──────┐                       │
-│  │         Database Layer          │                       │
-│  │  (SQLite + pandas CSV loader)   │                       │
-│  └─────────────────────────────────┘                       │
-└─────────────────────────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              GOOGLE GEMINI API                              │
-│  Natural language → SQL + Chart config + Insights           │
-└─────────────────────────────────────────────────────────────┘
-```
+## Architecture
 
----
+- Frontend: Next.js 15, React 19, TypeScript, Tailwind CSS
+- Backend: FastAPI + pandas + SQLite
+- LLM: Google Gemini (with schema-grounded prompting + SQL safety validation)
+- Infra: Local run or Docker Compose
 
-## ✨ Features
-
-| Feature | Description |
-|---|---|
-| 💬 **Chat Interface** | Type natural language questions, get instant dashboards |
-| 📊 **Smart Chart Selection** | Auto-selects bar, line, pie, or scatter based on data type |
-| 🔄 **Follow-up Questions** | Chat with the dashboard to filter/alter charts |
-| 📁 **CSV Upload** | Upload any CSV and start prompting it immediately |
-| 🛡️ **SQL Validation** | All LLM-generated SQL is validated before execution |
-| 🎭 **Mock Mode** | Works without a Gemini API key using built-in responses |
-| 🌙 **Dark Mode** | Clean, professional dark UI |
-| 📱 **Responsive** | Works on desktop and mobile |
-
----
-
-## 🚀 Quick Start
+## Quick Start (Local)
 
 ### Prerequisites
-- **Node.js** 18+ and npm
-- **Python** 3.10+
-- (Optional) **Google Gemini API key** from [Google AI Studio](https://aistudio.google.com/)
 
-### 1. Clone & Setup Environment
+- Node.js 18+
+- Python 3.10+
+- Optional: GEMINI_API_KEY
 
-```bash
-git clone https://github.com/ACCHU04/E-COMMERCE.git
-cd E-COMMERCE
-
-# Copy environment template
-cp .env.example backend/.env
-# Edit backend/.env and add your GEMINI_API_KEY (optional — app works without it)
-```
-
-### 2. Start the Backend
+### 1. Backend
 
 ```bash
 cd backend
-python -m venv venv
-
-# macOS / Linux
-source venv/bin/activate
+python -m venv .venv
 
 # Windows PowerShell
-.\venv\Scripts\Activate.ps1
-
-# Windows Command Prompt
-venv\Scripts\activate.bat
+.\.venv\Scripts\Activate.ps1
 
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-The API will be available at `http://localhost:8000`.
-Swagger docs: `http://localhost:8000/docs`
+Backend docs: http://localhost:8000/docs
 
-### 3. Start the Frontend
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -103,204 +53,157 @@ npm install
 npm run dev
 ```
 
-The app will be available at `http://localhost:3000`.
+Frontend app: http://localhost:3000
 
----
+## Docker Run
 
-## 🐳 Docker (One-Command Setup)
+1. Create root `.env` with a valid `GEMINI_API_KEY` (or omit to use mock fallback behavior where applicable).
+2. Run:
 
 ```bash
-# Copy and configure environment
-cp .env.example .env
-# Edit .env with your GEMINI_API_KEY
-
-# Start everything
-docker-compose up --build
+docker compose up --build
 ```
 
----
+Frontend: http://localhost:3000  
+Backend: http://localhost:8000/docs
 
-## 🔑 Environment Variables
+## Environment Variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `GEMINI_API_KEY` | Optional | Google Gemini API key. Without it, app runs in mock mode. |
-| `DB_PATH` | No | SQLite database path (default: `ecommerce.db`) |
-| `DATA_DIR` | No | Directory containing CSV files (default: `../data`) |
-| `DEFAULT_CSV` | No | Default dataset filename (default: `amazon_sales.csv`) |
-| `NEXT_PUBLIC_API_URL` | No | Backend URL for frontend (default: `http://localhost:8000`) |
+### Backend
 
----
+- `GEMINI_API_KEY` (optional but recommended)
+- `DB_PATH` (optional)
+- `DATA_DIR` (optional)
+- `DEFAULT_CSV` (optional)
 
-## 📊 Example Queries
+### Frontend
 
-### Simple — Category Revenue
-> **"What are the total sales by product category?"**
+- `NEXT_PUBLIC_API_URL` (optional, default: http://localhost:8000)
+- `INTERNAL_API_URL` (used in Docker server-side requests)
 
-Generates a bar chart and pie chart showing revenue distribution across Books, Fashion, Electronics, Home, Sports, and Beauty categories.
+## Core User Flows
 
-### Medium — Time Series by Region
-> **"Show me monthly revenue trends for 2023 broken down by region"**
+### 1. Ask a Question
 
-Generates a multi-series line chart showing month-over-month revenue for each geographical region (North America, Europe, Asia, etc.).
+Examples:
 
-### Complex — Multi-Metric Analysis
-> **"Compare the average discount percentage vs average rating across categories, and show which payment method generates the most revenue in North America"**
+- What are the total sales by product category?
+- Show monthly revenue trend
+- Which region has the highest revenue?
+- Show top 5 performers
 
-Generates multiple charts: a scatter/bar chart comparing discount vs rating by category, plus a pie chart of payment method revenue for the North American region.
+### 2. Refine with Follow-Ups
 
-### Follow-up Questions
-After generating any dashboard:
-- *"Now filter this to only show Asia"*
-- *"Show the same data but for 2022 only"*
-- *"Which category has the highest average rating?"*
+Examples:
 
----
+- Change this to line chart
+- Filter this to Asia
+- Show only Q3
 
-## 📁 Project Structure
+### 3. Export Results
 
+- Top bar: Export PDF
+- Dashboard: Export JSON / CSV / Print
+- Reports view: session JSON + dashboard PDF
+
+## API Summary
+
+### POST `/api/query`
+
+Request:
+
+```json
+{
+  "query": "Show monthly revenue by region",
+  "session_id": "optional"
+}
 ```
+
+Response includes fields such as:
+
+- `charts`
+- `insights`
+- `sql_query`
+- `confidence`
+- `query_plan`
+- `clarification_needed`
+- `clarification_question`
+- `clarification_options`
+- `executive_summary`
+- `session_id`
+- `error`
+
+### POST `/api/upload`
+
+Multipart upload for dataset files.
+
+Supported file types:
+
+- `.csv`
+- `.json`
+- `.xlsx`
+- `.xls`
+
+Response includes dataset profile metadata:
+
+- `columns`
+- `row_count`
+- `dataset_profile`
+- `session_id`
+
+## Frontend UI Notes (Current)
+
+- Ambient dark intelligence theme
+- Sidebar section switching with persistent in-session context
+- Analytics-focused view for exploration
+- Reports view for export workflows
+- History view with replayable prompts and message log
+- Settings view with session stats
+
+## Project Structure
+
+```text
 E-COMMERCE/
-├── README.md
-├── data/
-│   └── amazon_sales.csv          # Synthetic dataset (~1000 rows, 2022-2023)
-├── backend/
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   ├── main.py                   # FastAPI app, API endpoints
-│   ├── config.py                 # Settings (API keys, DB path)
-│   ├── database.py               # SQLite setup, CSV loading, query execution
-│   ├── llm_service.py            # Gemini API integration + prompt engineering
-│   ├── query_parser.py           # SQL validation & sanitization
-│   ├── chart_recommender.py      # Chart type selection heuristics
-│   └── models.py                 # Pydantic request/response models
-├── frontend/
-│   ├── package.json
-│   ├── next.config.js
-│   ├── tailwind.config.js
-│   ├── Dockerfile
-│   └── src/
-│       ├── app/
-│       │   ├── layout.tsx
-│       │   ├── page.tsx
-│       │   └── globals.css
-│       ├── components/
-│       │   ├── ChatInterface.tsx  # Chat input + message history
-│       │   ├── Dashboard.tsx      # Dashboard container
-│       │   ├── ChartRenderer.tsx  # Plotly chart wrapper
-│       │   ├── FileUpload.tsx     # CSV upload with drag-and-drop
-│       │   ├── InsightCard.tsx    # AI insight display
-│       │   └── LoadingState.tsx   # Loading animations
-│       ├── lib/
-│       │   └── api.ts             # API client
-│       └── types/
-│           └── index.ts           # TypeScript types
-├── .env.example
-├── .gitignore
-└── docker-compose.yml
+|- README.md
+|- docker-compose.yml
+|- backend/
+|  |- main.py
+|  |- models.py
+|  |- database.py
+|  |- query_parser.py
+|  |- llm_service.py
+|  |- chart_recommender.py
+|  |- requirements.txt
+|- frontend/
+|  |- package.json
+|  |- src/
+|  |  |- app/
+|  |  |  |- page.tsx
+|  |  |  |- layout.tsx
+|  |  |  |- globals.css
+|  |  |- components/
+|  |  |  |- ChatInterface.tsx
+|  |  |  |- Dashboard.tsx
+|  |  |  |- ChartRenderer.tsx
+|  |  |  |- FileUpload.tsx
+|  |  |  |- InsightCard.tsx
+|  |  |  |- LoadingState.tsx
+|  |  |- lib/
+|  |  |  |- api.ts
+|  |  |- types/
+|  |     |- index.ts
+|- data/
+|  |- amazon_sales.csv
 ```
 
----
+## Security and Reliability
 
-## 🔌 API Reference
+- SQL allowlist (SELECT-only)
+- Injection/comment blocking
+- Schema-aware SQL validation against known columns
+- LLM output normalization + retry/repair strategy
+- Graceful empty/error handling in UI
 
-### `POST /api/query`
-Process a natural language query and return dashboard charts.
-
-**Request:**
-```json
-{
-  "query": "Show me monthly revenue trends for 2023",
-  "session_id": "optional-session-id"
-}
-```
-
-**Response:**
-```json
-{
-  "charts": [
-    {
-      "chart_type": "line",
-      "title": "Monthly Revenue Trend 2023",
-      "data": [...],
-      "x_column": "month",
-      "y_column": "total_revenue",
-      "description": "..."
-    }
-  ],
-  "insights": "Revenue shows a strong upward trend...",
-  "sql_query": "SELECT strftime('%Y-%m', order_date) AS month...",
-  "session_id": "abc123",
-  "error": null
-}
-```
-
-### `POST /api/upload`
-Upload a CSV file to create a new queryable session.
-
-**Request:** Multipart form with `file` field (CSV only)
-
-**Response:**
-```json
-{
-  "message": "Dataset 'my_data.csv' loaded successfully",
-  "columns": ["col1", "col2", ...],
-  "row_count": 1500,
-  "session_id": "new-uuid",
-  "schema_info": [...]
-}
-```
-
-### `GET /api/schema?session_id=<id>`
-Get the schema and sample data for the current/session dataset.
-
----
-
-## 🧠 How It Works
-
-1. **User types a question** in the chat interface
-2. **Frontend sends** the query + session ID to `POST /api/query`
-3. **Backend calls Gemini API** with a carefully engineered system prompt that includes:
-   - The database schema
-   - Chart type selection rules
-   - SQL generation guidelines
-   - Hallucination prevention instructions
-4. **Gemini returns** a JSON object with SQL queries, chart types, and insights
-5. **Backend validates** the SQL (only SELECT allowed, no injection patterns)
-6. **Backend executes** the SQL against SQLite
-7. **Frontend renders** interactive Plotly charts with the returned data
-
----
-
-## 🛡️ Security & Hallucination Prevention
-
-- **SQL Validation**: Only `SELECT` statements are allowed; INSERT/UPDATE/DELETE/DROP are blocked
-- **Comment Injection Prevention**: SQL comments (`--`, `/*`) are rejected
-- **Schema-grounded Prompts**: The LLM is always given the actual schema — it cannot invent columns
-- **Empty Result Handling**: Charts with no data are silently skipped
-- **Error Transparency**: Errors are shown to the user with actionable messages
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Frontend** | Next.js 15, React 19, TypeScript, Tailwind CSS |
-| **Charts** | Plotly.js / react-plotly.js |
-| **Backend** | Python FastAPI, Uvicorn |
-| **LLM** | Google Gemini 1.5 Flash |
-| **Database** | SQLite (via Python sqlite3 + pandas) |
-| **Deployment** | Docker + docker-compose |
-
----
-
-## 📸 Screenshots
-
-*Run the app locally to see it in action!*
-
----
-
-## 📄 License
+## License
 
 MIT
