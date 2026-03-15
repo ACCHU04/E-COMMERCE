@@ -9,6 +9,7 @@ interface ChatInterfaceProps {
   messages: ChatMessage[];
   onSendMessage: (query: string) => void;
   isLoading: boolean;
+  suggestedQueries?: string[];
 }
 
 const EXAMPLE_QUERIES = [
@@ -21,6 +22,7 @@ export function ChatInterface({
   messages,
   onSendMessage,
   isLoading,
+  suggestedQueries,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -43,6 +45,8 @@ export function ChatInterface({
     }
   };
 
+  const chips = suggestedQueries?.length ? suggestedQueries : EXAMPLE_QUERIES;
+
   return (
     <div className="flex flex-col bg-slate-900 border border-slate-800 rounded-xl overflow-hidden h-[600px]">
       {/* Header */}
@@ -61,7 +65,7 @@ export function ChatInterface({
               <p className="text-slate-600 text-xs">I&apos;ll generate interactive charts from your data</p>
             </div>
             <div className="w-full space-y-2">
-              {EXAMPLE_QUERIES.map((q, i) => (
+              {chips.map((q, i) => (
                 <button
                   key={i}
                   onClick={() => onSendMessage(q)}

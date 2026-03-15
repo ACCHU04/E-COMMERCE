@@ -17,7 +17,7 @@ export function FileUpload({ onUpload, isLoading }: FileUploadProps) {
       e.preventDefault();
       setDragOver(false);
       const file = e.dataTransfer.files[0];
-      if (file?.name.toLowerCase().endsWith(".csv")) {
+      if (file && /\.(csv|json|xlsx|xls)$/i.test(file.name)) {
         setSelectedFile(file);
       }
     },
@@ -43,7 +43,7 @@ export function FileUpload({ onUpload, isLoading }: FileUploadProps) {
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
       <div className="flex items-center gap-2 mb-3">
         <Upload className="w-4 h-4 text-slate-400" />
-        <span className="text-sm font-medium text-slate-300">Upload CSV</span>
+        <span className="text-sm font-medium text-slate-300">Upload Dataset</span>
         <span className="text-xs text-slate-600 ml-auto">optional</span>
       </div>
 
@@ -60,12 +60,14 @@ export function FileUpload({ onUpload, isLoading }: FileUploadProps) {
           onClick={() => document.getElementById("csv-input")?.click()}
         >
           <Upload className="w-6 h-6 text-slate-600 mx-auto mb-2" />
-          <p className="text-xs text-slate-500">Drop CSV here or click to browse</p>
+          <p className="text-xs text-slate-500">Drop CSV/JSON/XLSX here or click to browse</p>
           <input
             id="csv-input"
             type="file"
-            accept=".csv"
+            accept=".csv,.json,.xlsx,.xls"
             className="hidden"
+            aria-label="Select dataset file"
+            title="Select dataset file"
             onChange={handleFileChange}
           />
         </div>
@@ -76,6 +78,8 @@ export function FileUpload({ onUpload, isLoading }: FileUploadProps) {
           <button
             onClick={handleClear}
             disabled={isLoading}
+            aria-label="Clear selected file"
+            title="Clear selected file"
             className="text-slate-500 hover:text-slate-300 transition-colors disabled:opacity-50"
           >
             <X className="w-3.5 h-3.5" />

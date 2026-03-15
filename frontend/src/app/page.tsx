@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Dashboard } from "@/components/Dashboard";
@@ -14,6 +14,24 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadInfo, setUploadInfo] = useState<UploadResponse | null>(null);
+  const [queryHistory, setQueryHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("bi_query_history");
+      if (raw) {
+        const parsed = JSON.parse(raw) as string[];
+        setQueryHistory(parsed.slice(0, 10));
+      }
+    } catch {
+      setQueryHistory([]);
+    }
+  }, []);
+
+  const persistQueryHistory = (items: string[]) => {
+    setQueryHistory(items);
+    localStorage.setItem("bi_query_history", JSON.stringify(items));
+  };
 
   const handleSendQuery = useCallback(
     async (query: string) => {
@@ -24,6 +42,8 @@ export default function Home() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, userMessage]);
+      const nextHistory = [query, ...queryHistory.filter((q) => q !== query)].slice(0, 10);
+      persistQueryHistory(nextHistory);
       setIsLoading(true);
 
       try {
@@ -91,8 +111,8 @@ export default function Home() {
         id: uuidv4(),
         role: "assistant",
         content: detail
-          ? `CSV upload failed: ${detail}`
-          : "Failed to upload the CSV file. Please ensure it is a valid CSV file.",
+          ? `Upload failed: ${detail}`
+          : "Failed to upload the dataset. Supported formats: CSV, JSON, XLSX.",
         timestamp: new Date(),
         error: "Upload error",
       };
@@ -107,6 +127,22 @@ export default function Home() {
     setMessages([]);
     setUploadInfo(null);
   }, []);
+
+  const suggestedQueries = useMemo(() => {
+    if (!uploadInfo?.columns?.length) return undefined;
+    const cols = uploadInfo.columns.map((c) => c.toLowerCase());
+    const hasDate = cols.some((c) => c.includes("date") || c.includes("month") || c.includes("year"));
+    const hasRevenue = cols.some((c) => c.includes("revenue") || c.includes("sales") || c.includes("amount"));
+    const hasCategory = cols.some((c) => c.includes("category") || c.includes("product"));
+    const hasRegion = cols.some((c) => c.includes("region") || c.includes("country") || c.includes("state"));
+
+    const chips: string[] = [];
+    if (hasRevenue && hasDate) chips.push("Show monthly revenue trend");
+    if (hasRevenue && hasCategory) chips.push("Compare revenue by product category");
+    if (hasRevenue && hasRegion) chips.push("Which region has the highest revenue?");
+    chips.push("Show top 5 performers");
+    return chips.slice(0, 4);
+  }, [uploadInfo]);
 
   // Get the latest assistant message that has charts
   const latestDashboard = [...messages]
@@ -159,10 +195,28 @@ export default function Home() {
                 </p>
               </div>
             )}
+            {!!queryHistory.length && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-medium text-slate-300">Query History</p>
+                <div className="space-y-1.5">
+                  {queryHistory.slice(0, 5).map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => handleSendQuery(q)}
+                      disabled={isLoading}
+                      className="w-full text-left text-xs text-slate-400 hover:text-slate-200 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 px-2.5 py-1.5 rounded-md disabled:opacity-50"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <ChatInterface
               messages={messages}
               onSendMessage={handleSendQuery}
               isLoading={isLoading}
+              suggestedQueries={suggestedQueries}
             />
           </div>
 

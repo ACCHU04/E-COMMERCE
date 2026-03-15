@@ -102,13 +102,46 @@ def _parse_llm_response(raw: str) -> dict:
     raw = raw.strip()
 
     try:
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        return _normalize_dashboard_response(parsed)
     except json.JSONDecodeError:
         # Try to find JSON object in the response
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         if match:
-            return json.loads(match.group())
+            parsed = json.loads(match.group())
+            return _normalize_dashboard_response(parsed)
         raise
+
+
+def _normalize_dashboard_response(payload: dict[str, Any]) -> dict[str, Any]:
+    """Force LLM output into a strict response schema."""
+    charts = payload.get("charts", [])
+    normalized_charts = []
+
+    if isinstance(charts, list):
+        for item in charts:
+            if not isinstance(item, dict):
+                continue
+            chart_type = str(item.get("chart_type", "bar")).lower()
+            if chart_type not in {"bar", "line", "pie", "scatter"}:
+                chart_type = "bar"
+            normalized_charts.append({
+                "chart_type": chart_type,
+                "title": item.get("title", "Chart"),
+                "sql": item.get("sql", ""),
+                "x_column": item.get("x_column"),
+                "y_column": item.get("y_column"),
+                "color_column": item.get("color_column"),
+                "labels_column": item.get("labels_column"),
+                "values_column": item.get("values_column"),
+                "description": item.get("description", ""),
+            })
+
+    return {
+        "charts": normalized_charts,
+        "insights": str(payload.get("insights", "")),
+        "error": payload.get("error"),
+    }
 
 
 def _get_mock_response(user_query: str) -> dict:
@@ -316,3 +349,48 @@ async def generate_dashboard(
             "insights": "",
             "error": f"Unable to process your query. Please try rephrasing it. (Error: {error_msg[:100]})"
         }
+
+
+async def repair_sql_query(
+    user_query: str,
+    failed_sql: str,
+    execution_error: str,
+    schema_context: str = DEFAULT_SCHEMA_CONTEXT,
+) -> str | None:
+    """Ask Gemini to repair a failed SQL query and return only corrected SQL."""
+    if settings.mock_mode or not settings.gemini_api_key:
+        return None
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=settings.gemini_api_key)
+
+        repair_prompt = f"""You are fixing a SQLite SELECT query for an e-commerce BI app.
+
+Database schema:
+{schema_context}
+
+Original user request:
+{user_query}
+
+Failed SQL:
+{failed_sql}
+
+Execution error:
+{execution_error}
+
+Return ONLY a corrected SQLite SELECT query. No markdown, no explanation.
+"""
+
+        model = genai.GenerativeModel(
+            model_name=settings.gemini_model,
+            system_instruction="Return only corrected SQL. Must be a single SELECT statement.",
+        )
+        response = model.generate_content(repair_prompt)
+        sql_text = (response.text or "").strip()
+        sql_text = re.sub(r"^```sql\s*", "", sql_text, flags=re.IGNORECASE)
+        sql_text = re.sub(r"^```\s*", "", sql_text)
+        sql_text = re.sub(r"\s*```$", "", sql_text).strip()
+        return sql_text or None
+    except Exception:
+        return None

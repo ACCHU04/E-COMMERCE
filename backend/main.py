@@ -8,8 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from models import QueryRequest, QueryResponse, SchemaResponse, UploadResponse, ChartData, QueryPlan, ExecutiveSummary
 from database import init_default_db, execute_query, get_schema, load_csv_for_session, get_dataset_profile
-from llm_service import generate_dashboard, DEFAULT_SCHEMA_CONTEXT
-from query_parser import validate_sql, clean_sql
+from llm_service import generate_dashboard, repair_sql_query, DEFAULT_SCHEMA_CONTEXT
+from query_parser import validate_sql, validate_sql_columns, clean_sql
 from chart_recommender import recommend_chart
 
 app = FastAPI(
@@ -196,6 +196,8 @@ async def api_query(request: QueryRequest):
 
     # Get schema context (custom for uploaded datasets, default for base dataset)
     schema_context = _session_schema_context.get(session_id, DEFAULT_SCHEMA_CONTEXT)
+    schema_info = get_schema(session_id)
+    allowed_columns = {col.name.lower() for col in schema_info.columns}
 
     clarification_needed, clarification_question, clarification_options = _detect_clarification_need(request.query)
     if clarification_needed:
@@ -300,12 +302,44 @@ async def api_query(request: QueryRequest):
                 warnings.append(f"Skipped invalid SQL: {validation_error}")
             continue  # Skip invalid charts
 
+        # Hallucination guard: ensure SQL references only known columns
+        cols_ok, cols_error = validate_sql_columns(sql, allowed_columns)
+        if not cols_ok:
+            if cols_error:
+                warnings.append(cols_error)
+            continue
+
         # Execute query
         try:
             data = execute_query(sql, session_id)
         except Exception as e:
-            warnings.append(f"Query execution failed and was skipped: {str(e)}")
-            continue  # Skip charts with execution errors
+            # Auto-repair loop: ask LLM to fix SQL once using execution error details.
+            repaired_sql = await repair_sql_query(
+                user_query=request.query,
+                failed_sql=sql,
+                execution_error=str(e),
+                schema_context=schema_context,
+            )
+
+            if repaired_sql:
+                repaired_sql = clean_sql(repaired_sql)
+                valid_repair, repair_err = validate_sql(repaired_sql)
+                cols_ok_repair, cols_err_repair = validate_sql_columns(repaired_sql, allowed_columns)
+                if valid_repair and cols_ok_repair:
+                    try:
+                        data = execute_query(repaired_sql, session_id)
+                        sql = repaired_sql
+                        last_sql = repaired_sql
+                    except Exception as retry_error:
+                        warnings.append(f"Retry SQL failed: {str(retry_error)}")
+                        continue
+                else:
+                    merged_error = repair_err or cols_err_repair or "Repaired SQL failed validation"
+                    warnings.append(f"Retry validation failed: {merged_error}")
+                    continue
+            else:
+                warnings.append(f"Query execution failed and was skipped: {str(e)}")
+                continue  # Skip charts with execution errors
 
         if not data:
             continue  # Skip empty result sets
@@ -381,13 +415,19 @@ async def api_query(request: QueryRequest):
 @app.post("/api/upload", response_model=UploadResponse)
 async def api_upload(file: UploadFile = File(...)):
     """Upload a CSV file and create a new session for it."""
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="A file is required")
+
+    lowered_name = file.filename.lower()
+    allowed_ext = (".csv", ".json", ".xlsx", ".xls")
+    if not lowered_name.endswith(allowed_ext):
+        raise HTTPException(status_code=400, detail="Supported file types: CSV, JSON, XLSX")
 
     session_id = str(uuid.uuid4())
 
     # Save uploaded file temporarily
-    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+    extension = os.path.splitext(file.filename)[1] or ".csv"
+    with tempfile.NamedTemporaryFile(suffix=extension, delete=False) as tmp:
         content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
@@ -400,12 +440,14 @@ async def api_upload(file: UploadFile = File(...)):
             f"- {col.name} ({col.type}): sample values: {', '.join(str(v) for v in col.sample_values[:3])}"
             for col in schema.columns
         ])
+        sample_rows_json = schema.sample_data[:3]
         schema_context = f"""
 Table name: sales_data
 Columns:
 {col_descriptions}
 
 Total rows: {schema.row_count}
+    Sample rows (first 3): {sample_rows_json}
 """
         _session_schema_context[session_id] = schema_context
 

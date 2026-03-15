@@ -34,8 +34,8 @@ def load_csv_for_session(csv_path: str, session_id: str) -> SchemaResponse:
 
 
 def _load_csv_to_db(csv_path: str, db_path: str, table_name: str) -> None:
-    """Load CSV file into a SQLite database table."""
-    df = _read_csv_with_fallbacks(csv_path)
+    """Load CSV/JSON/XLSX file into a SQLite database table."""
+    df = _read_table_with_fallbacks(csv_path)
     if df.empty:
         raise ValueError("CSV file is empty")
     # Normalize column names: lowercase, replace spaces with underscores
@@ -45,8 +45,19 @@ def _load_csv_to_db(csv_path: str, db_path: str, table_name: str) -> None:
     conn.close()
 
 
-def _read_csv_with_fallbacks(csv_path: str) -> pd.DataFrame:
-    """Read CSVs with common encoding/delimiter fallbacks for user-uploaded files."""
+def _read_table_with_fallbacks(csv_path: str) -> pd.DataFrame:
+    """Read CSV/JSON/XLSX files with common fallbacks for user uploads."""
+    ext = Path(csv_path).suffix.lower()
+
+    if ext in {".xlsx", ".xls"}:
+        return pd.read_excel(csv_path)
+
+    if ext == ".json":
+        try:
+            return pd.read_json(csv_path)
+        except ValueError:
+            return pd.read_json(csv_path, lines=True)
+
     encodings = ["utf-8", "utf-8-sig", "cp1252", "latin-1"]
     read_attempts = [
         {},
@@ -62,7 +73,7 @@ def _read_csv_with_fallbacks(csv_path: str) -> pd.DataFrame:
                 last_error = exc
 
     raise ValueError(
-        "Unable to read CSV. Please upload a valid CSV encoded as UTF-8, UTF-8 with BOM, CP1252, or Latin-1."
+        "Unable to read file. Supported formats: CSV (UTF-8/UTF-8 BOM/CP1252/Latin-1), JSON, XLSX."
     ) from last_error
 
 
