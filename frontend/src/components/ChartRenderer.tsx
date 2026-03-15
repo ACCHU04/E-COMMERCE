@@ -50,53 +50,104 @@ const DARK_LAYOUT: Partial<Plotly.Layout> = {
 };
 
 export function ChartRenderer({ chart }: ChartRendererProps) {
-  const isCurrencyMetric = useMemo(() => {
-    const candidate = (chart.y_column || chart.values_column || "").toLowerCase();
-    return /(revenue|sales|amount|price|cost|gmv|profit)/i.test(candidate);
+  const resolvedChart = useMemo(() => {
+    const { chart_type, data, x_column, y_column, labels_column, values_column, color_column } = chart;
+    const hasX = Boolean(x_column);
+    const hasY = Boolean(y_column);
+    const hasLabels = Boolean(labels_column || x_column);
+    const hasValues = Boolean(values_column || y_column);
+    const sampleRow = data?.[0] ?? {};
+
+    const numericCandidates = Object.keys(sampleRow).filter((key) => {
+      const value = Number((sampleRow as Record<string, unknown>)[key]);
+      return Number.isFinite(value);
+    });
+
+    let nextType = chart_type;
+    let fallbackNote: string | null = null;
+
+    if ((chart_type === "line" || chart_type === "area" || chart_type === "scatter") && (!hasX || !hasY)) {
+      nextType = "bar";
+      fallbackNote = "This result did not include enough axis metadata for the requested chart type, so it was rendered as a bar chart.";
+    }
+
+    if ((chart_type === "pie" || chart_type === "donut") && (!hasLabels || !hasValues)) {
+      nextType = "bar";
+      fallbackNote = "This result could not be rendered as a pie-style chart, so it was rendered as a bar chart.";
+    }
+
+    if (chart_type === "horizontal_bar" && (!hasX || !hasY)) {
+      nextType = "bar";
+      fallbackNote = "This result did not include enough ranking fields for a horizontal bar chart, so it was rendered as a standard bar chart.";
+    }
+
+    if (chart_type === "stacked_bar" && (!hasX || !hasY)) {
+      nextType = "bar";
+      fallbackNote = "This result did not include enough fields for a stacked bar chart, so it was rendered as a standard bar chart.";
+    }
+
+    if (chart_type === "heatmap") {
+      const valueKey = values_column || color_column || numericCandidates.find((key) => key !== x_column && key !== y_column);
+      if (!hasX || !hasY || !valueKey) {
+        nextType = "bar";
+        fallbackNote = "This result could not be shaped into a heatmap matrix, so it was rendered as a bar chart.";
+      }
+    }
+
+    return {
+      ...chart,
+      chart_type: nextType,
+      fallbackNote,
+    };
   }, [chart]);
 
-  const reasoning = useMemo(() => {
-    const x = chart.x_column || chart.labels_column || "dimension";
-    const y = chart.y_column || chart.values_column || "metric";
+  const isCurrencyMetric = useMemo(() => {
+    const candidate = (resolvedChart.y_column || resolvedChart.values_column || "").toLowerCase();
+    return /(revenue|sales|amount|price|cost|gmv|profit)/i.test(candidate);
+  }, [resolvedChart]);
 
-    if (chart.chart_type === "line") {
+  const reasoning = useMemo(() => {
+    const x = resolvedChart.x_column || resolvedChart.labels_column || "dimension";
+    const y = resolvedChart.y_column || resolvedChart.values_column || "metric";
+
+    if (resolvedChart.chart_type === "line") {
       return `Line chart selected because the query implies trend/time progression using ${x}.`;
     }
-    if (chart.chart_type === "area") {
+    if (resolvedChart.chart_type === "area") {
       return `Area chart selected to emphasize total magnitude changes over time using ${x}.`;
     }
-    if (chart.chart_type === "bar") {
+    if (resolvedChart.chart_type === "bar") {
       return `Bar chart selected for category comparison between ${x} and ${y}.`;
     }
-    if (chart.chart_type === "horizontal_bar") {
+    if (resolvedChart.chart_type === "horizontal_bar") {
       return `Horizontal bar chart selected for ranked comparison where label readability matters for ${x}.`;
     }
-    if (chart.chart_type === "stacked_bar") {
-      return `Stacked bar chart selected to compare totals and composition across ${x} grouped by ${chart.color_column || "segment"}.`;
+    if (resolvedChart.chart_type === "stacked_bar") {
+      return `Stacked bar chart selected to compare totals and composition across ${x} grouped by ${resolvedChart.color_column || "segment"}.`;
     }
-    if (chart.chart_type === "pie") {
+    if (resolvedChart.chart_type === "pie") {
       return `Pie chart selected to show part-to-whole contribution by ${x}.`;
     }
-    if (chart.chart_type === "donut") {
+    if (resolvedChart.chart_type === "donut") {
       return `Donut chart selected to show contribution share by ${x} with a clearer summary-friendly layout.`;
     }
-    if (chart.chart_type === "scatter") {
+    if (resolvedChart.chart_type === "scatter") {
       return `Scatter chart selected to inspect correlation between ${x} and ${y}.`;
     }
-    if (chart.chart_type === "heatmap") {
+    if (resolvedChart.chart_type === "heatmap") {
       return `Heatmap selected to show intensity across the ${x} by ${y} matrix.`;
     }
     return `Chart selected based on detected data shape and metric intent.`;
-  }, [chart]);
+  }, [resolvedChart]);
 
   const { plotData, layout } = useMemo(() => {
-    const { chart_type, data, x_column, y_column, color_column, labels_column, values_column } = chart;
+    const { chart_type, data, x_column, y_column, color_column, labels_column, values_column } = resolvedChart;
 
     let plotData: Plotly.Data[] = [];
     let layout: Partial<Plotly.Layout> = {
       ...DARK_LAYOUT,
       title: {
-        text: chart.title,
+        text: resolvedChart.title,
         font: { color: "#e2e8f0", size: 14 },
         x: 0.02,
       },
@@ -294,10 +345,15 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
     }
 
     return { plotData, layout };
-  }, [chart, isCurrencyMetric]);
+  }, [resolvedChart, isCurrencyMetric]);
 
   return (
     <div className="w-full">
+      {!plotData.length && (
+        <div className="px-4 pt-4 pb-2 text-sm text-amber-300">
+          This chart could not be rendered from the returned data.
+        </div>
+      )}
       <Plot
         data={plotData}
         layout={layout}
@@ -308,15 +364,18 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
           responsive: true,
           toImageButtonOptions: {
             format: "svg",
-            filename: chart.title.replace(/\s+/g, "_"),
+            filename: resolvedChart.title.replace(/\s+/g, "_"),
           },
           scrollZoom: true,
         }}
         style={{ width: "100%", minHeight: 320 }}
         useResizeHandler
       />
-      {chart.description && (
-        <p className="text-xs text-slate-500 px-2 pb-2">{chart.description}</p>
+      {resolvedChart.description && (
+        <p className="text-xs text-slate-500 px-2 pb-2">{resolvedChart.description}</p>
+      )}
+      {resolvedChart.fallbackNote && (
+        <p className="text-[11px] text-amber-300/90 px-2 pb-2">{resolvedChart.fallbackNote}</p>
       )}
       <p className="text-[11px] text-slate-600 px-2 pb-2">{reasoning}</p>
     </div>
