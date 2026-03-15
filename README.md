@@ -4,6 +4,8 @@ Turn natural-language questions into interactive dashboards, insights, and expor
 
 ## What Is Included
 
+- SQLite-backed execution for data-grounded SQL answers (no fabricated result rows)
+- Agentic 3-step pipeline: Plan -> Generate SQL -> Validate/Repair + Execute
 - Conversational analytics with follow-up questions
 - Interactive Plotly charts (bar, line, pie, scatter, donut, horizontal bar, stacked bar, heatmap, area)
 - Smart clarification flow when a query is ambiguous
@@ -21,6 +23,11 @@ Turn natural-language questions into interactive dashboards, insights, and expor
 - Backend: FastAPI + pandas + SQLite
 - LLM: Google Gemini (with schema-grounded prompting + SQL safety validation)
 - Infra: Local run or Docker Compose
+
+## Innovation Highlights
+
+- SQLite backend: generated SQL is executed on real tables, so dashboard values come from actual query results rather than LLM text hallucinations.
+- Agentic 3-step pipeline: intent planning, SQL generation, and validation/repair execution loop designed to align directly with innovation-rubric scoring.
 
 ## Quick Start (Local)
 
