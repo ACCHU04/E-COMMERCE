@@ -12,7 +12,7 @@ export interface SchemaResponse {
 }
 
 export interface ChartData {
-  chart_type: "bar" | "line" | "pie" | "scatter";
+  chart_type: "bar" | "line" | "pie" | "scatter" | "donut" | "horizontal_bar" | "stacked_bar" | "heatmap" | "area";
   title: string;
   data: Record<string, unknown>[];
   x_column: string | null;

@@ -19,30 +19,44 @@ def recommend_chart(
 
     # Map aliases
     alias_map = {
-        "donut": "pie",
         "column": "bar",
         "histogram": "bar",
         "time_series": "line",
         "timeseries": "line",
-        "area": "line",
+        "horizontal": "horizontal_bar",
+        "horizontal-bar": "horizontal_bar",
+        "horizontal bar": "horizontal_bar",
+        "stacked": "stacked_bar",
+        "stack": "stacked_bar",
+        "stacked-bar": "stacked_bar",
+        "stacked bar": "stacked_bar",
     }
     hint = alias_map.get(hint, hint)
 
-    valid_types = {"bar", "line", "pie", "scatter"}
+    valid_types = {"bar", "line", "pie", "scatter", "donut", "horizontal_bar", "stacked_bar", "heatmap", "area"}
     if hint not in valid_types:
         hint = "bar"
 
     # Heuristic overrides
     if x_col and _is_date_column(x_col, data):
         # Time series data should use line chart
-        if hint not in ("line", "bar"):
+        if hint not in ("line", "bar", "area"):
             return "line"
 
     if not color_col and y_col:
         row_count = len(data)
         # Too many categories for pie chart → switch to bar
-        if hint == "pie" and row_count > 8:
+        if hint in ("pie", "donut") and row_count > 8:
             return "bar"
+
+    if hint == "heatmap" and (not x_col or not y_col):
+        return "bar"
+
+    if hint == "stacked_bar" and not color_col:
+        return "bar"
+
+    if hint == "horizontal_bar" and not y_col:
+        return "bar"
 
     return hint
 

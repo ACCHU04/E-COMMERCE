@@ -74,11 +74,31 @@ def _try_followup_chart_transform(user_query: str, session_id: str) -> tuple[lis
         return None, None
 
     q = user_query.lower().strip()
-    match = re.search(r"\b(change|convert|switch)\b.*\b(bar|line|pie|scatter)\b", q)
-    if not match:
+    target = None
+    transform_targets = {
+        "horizontal bar": "horizontal_bar",
+        "stacked bar": "stacked_bar",
+        "heatmap": "heatmap",
+        "donut": "donut",
+        "area": "area",
+        "bar": "bar",
+        "line": "line",
+        "pie": "pie",
+        "scatter": "scatter",
+    }
+    if re.search(r"\b(change|convert|switch)\b", q):
+        for phrase, normalized in transform_targets.items():
+            if phrase in q:
+                target = normalized
+                break
+
+    if not target:
+        match = re.search(r"\b(change|convert|switch)\b.*\b(bar|line|pie|scatter)\b", q)
+        if match:
+            target = match.group(2)
+    if not target:
         return None, None
 
-    target = match.group(2)
     transformed = []
     for chart in last_dashboard.get("charts", []):
         transformed.append(ChartData(

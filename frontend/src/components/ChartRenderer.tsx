@@ -62,14 +62,29 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
     if (chart.chart_type === "line") {
       return `Line chart selected because the query implies trend/time progression using ${x}.`;
     }
+    if (chart.chart_type === "area") {
+      return `Area chart selected to emphasize total magnitude changes over time using ${x}.`;
+    }
     if (chart.chart_type === "bar") {
       return `Bar chart selected for category comparison between ${x} and ${y}.`;
+    }
+    if (chart.chart_type === "horizontal_bar") {
+      return `Horizontal bar chart selected for ranked comparison where label readability matters for ${x}.`;
+    }
+    if (chart.chart_type === "stacked_bar") {
+      return `Stacked bar chart selected to compare totals and composition across ${x} grouped by ${chart.color_column || "segment"}.`;
     }
     if (chart.chart_type === "pie") {
       return `Pie chart selected to show part-to-whole contribution by ${x}.`;
     }
+    if (chart.chart_type === "donut") {
+      return `Donut chart selected to show contribution share by ${x} with a clearer summary-friendly layout.`;
+    }
     if (chart.chart_type === "scatter") {
       return `Scatter chart selected to inspect correlation between ${x} and ${y}.`;
+    }
+    if (chart.chart_type === "heatmap") {
+      return `Heatmap selected to show intensity across the ${x} by ${y} matrix.`;
     }
     return `Chart selected based on detected data shape and metric intent.`;
   }, [chart]);
@@ -89,7 +104,7 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
 
     if (!data || data.length === 0) return { plotData: [], layout };
 
-    if (chart_type === "line") {
+    if (chart_type === "line" || chart_type === "area") {
       if (color_column) {
         // Multi-series line chart
         const groups = Array.from(new Set(data.map((d) => String(d[color_column]))));
@@ -103,6 +118,7 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
             y: filtered.map((d) => d[y_column!]),
             line: { color: CHART_COLORS[idx % CHART_COLORS.length], width: 2 },
             marker: { size: 5 },
+            fill: chart_type === "area" ? "tonexty" : undefined,
             hovertemplate: isCurrencyMetric
               ? `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`
               : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`,
@@ -117,8 +133,8 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
             y: data.map((d) => d[y_column!]),
             line: { color: CHART_COLORS[0], width: 2.5 },
             marker: { size: 6, color: CHART_COLORS[0] },
-            fill: "tozeroy",
-            fillcolor: "rgba(59,130,246,0.08)",
+            fill: chart_type === "area" ? "tozeroy" : undefined,
+            fillcolor: chart_type === "area" ? "rgba(59,130,246,0.12)" : undefined,
             hovertemplate: isCurrencyMetric
               ? `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`
               : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`,
@@ -135,7 +151,7 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
         yaxis: { ...DARK_LAYOUT.yaxis, title: { text: y_column ?? "", font: { color: "#64748b" } } },
       };
 
-    } else if (chart_type === "bar") {
+    } else if (chart_type === "bar" || chart_type === "horizontal_bar" || chart_type === "stacked_bar") {
       if (color_column) {
         const groups = Array.from(new Set(data.map((d) => String(d[color_column]))));
         plotData = groups.map((group, idx) => {
@@ -143,21 +159,35 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
           return {
             type: "bar",
             name: group,
-            x: filtered.map((d) => d[x_column!]),
-            y: filtered.map((d) => d[y_column!]),
+            orientation: chart_type === "horizontal_bar" ? "h" : undefined,
+            x: chart_type === "horizontal_bar"
+              ? filtered.map((d) => d[y_column!])
+              : filtered.map((d) => d[x_column!]),
+            y: chart_type === "horizontal_bar"
+              ? filtered.map((d) => d[x_column!])
+              : filtered.map((d) => d[y_column!]),
             marker: { color: CHART_COLORS[idx % CHART_COLORS.length] },
             hovertemplate: isCurrencyMetric
-              ? `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`
-              : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`,
+              ? (chart_type === "horizontal_bar"
+                ? `<b>${x_column}: %{y}</b><br>${y_column}: $%{x:,.2f}<extra></extra>`
+                : `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`)
+              : (chart_type === "horizontal_bar"
+                ? `<b>${x_column}: %{y}</b><br>${y_column}: %{x:,.2f}<extra></extra>`
+                : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`),
           } as Plotly.Data;
         });
-        layout = { ...layout, barmode: "group" };
+        layout = { ...layout, barmode: chart_type === "stacked_bar" ? "stack" : "group" };
       } else {
         plotData = [
           {
             type: "bar",
-            x: data.map((d) => d[x_column!]),
-            y: data.map((d) => d[y_column!]),
+            orientation: chart_type === "horizontal_bar" ? "h" : undefined,
+            x: chart_type === "horizontal_bar"
+              ? data.map((d) => d[y_column!])
+              : data.map((d) => d[x_column!]),
+            y: chart_type === "horizontal_bar"
+              ? data.map((d) => d[x_column!])
+              : data.map((d) => d[y_column!]),
             marker: {
               color: CHART_COLORS,
               opacity: 0.85,
@@ -165,14 +195,28 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
             selected: { marker: { opacity: 1 } },
             unselected: { marker: { opacity: 0.45 } },
             hovertemplate: isCurrencyMetric
-              ? `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`
-              : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`,
+              ? (chart_type === "horizontal_bar"
+                ? `<b>${x_column}: %{y}</b><br>${y_column}: $%{x:,.2f}<extra></extra>`
+                : `<b>${x_column}: %{x}</b><br>${y_column}: $%{y:,.2f}<extra></extra>`)
+              : (chart_type === "horizontal_bar"
+                ? `<b>${x_column}: %{y}</b><br>${y_column}: %{x:,.2f}<extra></extra>`
+                : `<b>${x_column}: %{x}</b><br>${y_column}: %{y:,.2f}<extra></extra>`),
           } as Plotly.Data,
         ];
       }
-      layout = { ...layout, xaxis: { ...DARK_LAYOUT.xaxis, title: { text: x_column ?? "", font: { color: "#64748b" } } }, yaxis: { ...DARK_LAYOUT.yaxis, title: { text: y_column ?? "", font: { color: "#64748b" } } } };
+      layout = chart_type === "horizontal_bar"
+        ? {
+            ...layout,
+            xaxis: { ...DARK_LAYOUT.xaxis, title: { text: y_column ?? "", font: { color: "#64748b" } } },
+            yaxis: { ...DARK_LAYOUT.yaxis, title: { text: x_column ?? "", font: { color: "#64748b" } }, automargin: true },
+          }
+        : {
+            ...layout,
+            xaxis: { ...DARK_LAYOUT.xaxis, title: { text: x_column ?? "", font: { color: "#64748b" } } },
+            yaxis: { ...DARK_LAYOUT.yaxis, title: { text: y_column ?? "", font: { color: "#64748b" } } },
+          };
 
-    } else if (chart_type === "pie") {
+    } else if (chart_type === "pie" || chart_type === "donut") {
       const labelsCol = labels_column || x_column;
       const valuesCol = values_column || y_column;
       plotData = [
@@ -183,7 +227,7 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
           marker: { colors: CHART_COLORS },
           textinfo: "label+percent",
           textfont: { color: "#e2e8f0", size: 11 },
-          hole: 0.35,
+          hole: chart_type === "donut" ? 0.52 : 0.2,
           hovertemplate: isCurrencyMetric
             ? "<b>%{label}</b><br>Value: $%{value:,.2f}<br>Share: %{percent}<extra></extra>"
             : "<b>%{label}</b><br>Value: %{value:,.2f}<br>Share: %{percent}<extra></extra>",
@@ -210,6 +254,43 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
         } as Plotly.Data,
       ];
       layout = { ...layout, xaxis: { ...DARK_LAYOUT.xaxis, title: { text: x_column ?? "", font: { color: "#64748b" } } }, yaxis: { ...DARK_LAYOUT.yaxis, title: { text: y_column ?? "", font: { color: "#64748b" } } } };
+    } else if (chart_type === "heatmap") {
+      const xValues = Array.from(new Set(data.map((d) => String(d[x_column!] ?? ""))));
+      const yValues = Array.from(new Set(data.map((d) => String(d[y_column!] ?? ""))));
+      const valueKey = values_column || color_column || Object.keys(data[0] || {}).find((key) => key !== x_column && key !== y_column) || y_column;
+      const matrix = yValues.map((yVal) =>
+        xValues.map((xVal) => {
+          const match = data.find(
+            (row) => String(row[x_column!] ?? "") === xVal && String(row[y_column!] ?? "") === yVal
+          );
+          const value = Number(match?.[valueKey!]);
+          return Number.isFinite(value) ? value : 0;
+        })
+      );
+
+      plotData = [
+        {
+          type: "heatmap",
+          x: xValues,
+          y: yValues,
+          z: matrix,
+          colorscale: [
+            [0, "#0f172a"],
+            [0.25, "#1d4ed8"],
+            [0.5, "#06b6d4"],
+            [0.75, "#7c3aed"],
+            [1, "#f59e0b"],
+          ],
+          hovertemplate: isCurrencyMetric
+            ? `<b>${x_column}: %{x}</b><br><b>${y_column}: %{y}</b><br>Value: $%{z:,.2f}<extra></extra>`
+            : `<b>${x_column}: %{x}</b><br><b>${y_column}: %{y}</b><br>Value: %{z:,.2f}<extra></extra>`,
+        } as Plotly.Data,
+      ];
+      layout = {
+        ...layout,
+        xaxis: { ...DARK_LAYOUT.xaxis, title: { text: x_column ?? "", font: { color: "#64748b" } } },
+        yaxis: { ...DARK_LAYOUT.yaxis, title: { text: y_column ?? "", font: { color: "#64748b" } } },
+      };
     }
 
     return { plotData, layout };

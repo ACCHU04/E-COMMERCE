@@ -117,8 +117,8 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
             revenue trends, product categories, or regional performance.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-2xl mt-2">
-          {["Bar Charts", "Line Trends", "Pie Charts"].map((label) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 w-full max-w-4xl mt-2">
+          {["Bar Charts", "Line Trends", "Donut Views", "Heatmaps", "Scatter Analysis"].map((label) => (
             <div
               key={label}
               className="text-center py-3 px-2 bg-slate-900/60 border border-white/10 rounded-lg text-xs text-slate-300"

@@ -35,7 +35,7 @@ For each user query, return a JSON object with this exact structure:
 {
   "charts": [
     {
-      "chart_type": "<bar|line|pie|scatter>",
+            "chart_type": "<bar|line|pie|scatter|donut|horizontal_bar|stacked_bar|heatmap|area>",
       "title": "<descriptive chart title>",
       "sql": "<valid SQLite SELECT query>",
       "x_column": "<column name for x-axis or null>",
@@ -52,9 +52,14 @@ For each user query, return a JSON object with this exact structure:
 
 Chart type selection rules:
 - Use "line" for time-series data (monthly trends, date-based analysis)
+- Use "area" for time-series queries when cumulative magnitude or filled trend emphasis is helpful
 - Use "bar" for categorical comparisons (by region, by category, by payment method)
+- Use "horizontal_bar" when category labels are long or you are ranking top/bottom items
+- Use "stacked_bar" for composition comparisons across categories when a grouping dimension exists
 - Use "pie" for parts-of-a-whole proportions (market share, distribution) — limit to ≤8 segments
+- Use "donut" for part-to-whole proportions when a center-summary friendly layout is useful
 - Use "scatter" for correlation analysis (two continuous variables)
+- Use "heatmap" for dense matrix-style comparisons such as month-by-region, category-by-payment-method, or two-dimensional intensity analysis
 - You may return multiple charts (2-3) for complex queries
 
 SQL rules:
@@ -123,7 +128,7 @@ def _normalize_dashboard_response(payload: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(item, dict):
                 continue
             chart_type = str(item.get("chart_type", "bar")).lower()
-            if chart_type not in {"bar", "line", "pie", "scatter"}:
+            if chart_type not in {"bar", "line", "pie", "scatter", "donut", "horizontal_bar", "stacked_bar", "heatmap", "area"}:
                 chart_type = "bar"
             normalized_charts.append({
                 "chart_type": chart_type,

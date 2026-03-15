@@ -5,7 +5,7 @@ Turn natural-language questions into interactive dashboards, insights, and expor
 ## What Is Included
 
 - Conversational analytics with follow-up questions
-- Interactive Plotly charts (bar, line, pie, scatter)
+- Interactive Plotly charts (bar, line, pie, scatter, donut, horizontal bar, stacked bar, heatmap, area)
 - Smart clarification flow when a query is ambiguous
 - Query planning + confidence indicators
 - Executive summary cards for decision-making
@@ -97,6 +97,10 @@ Examples:
 Examples:
 
 - Change this to line chart
+- Change this to donut chart
+- Switch this to horizontal bar
+- Show this as a heatmap
+- Convert this to stacked bar
 - Filter this to Asia
 - Show only Q3
 

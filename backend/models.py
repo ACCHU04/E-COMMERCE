@@ -21,7 +21,7 @@ class SchemaResponse(BaseModel):
 
 
 class ChartData(BaseModel):
-    chart_type: str  # bar, line, pie, scatter, donut
+    chart_type: str  # bar, line, pie, scatter, donut, horizontal_bar, stacked_bar, heatmap, area
     title: str
     data: list[dict[str, Any]]
     x_column: Optional[str] = None
