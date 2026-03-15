@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ChatMessage } from "@/types";
 import { ChartRenderer } from "./ChartRenderer";
 import { InsightCard } from "./InsightCard";
@@ -14,6 +14,8 @@ interface DashboardProps {
 }
 
 export function Dashboard({ messages, latestDashboard, isLoading }: DashboardProps) {
+  const [chartViewMode, setChartViewMode] = useState<"all" | "top3">("all");
+
   const exportDashboardJson = () => {
     if (!latestDashboard) return;
     const blob = new Blob([JSON.stringify(latestDashboard, null, 2)], {
@@ -147,8 +149,10 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
     );
   }
 
+  const visibleCharts = chartViewMode === "top3" ? charts.slice(0, 3) : charts;
   const chartCount = charts.length;
-  const gridCols = chartCount === 1 ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2";
+  const visibleCount = visibleCharts.length;
+  const gridCols = visibleCount === 1 ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2";
 
   return (
     <div className="glass-panel overflow-hidden">
@@ -159,6 +163,30 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
           <span className="text-sm font-head font-semibold text-slate-100">Dashboard Intelligence</span>
         </div>
         <div className="flex items-center gap-2">
+          {chartCount > 3 && (
+            <div className="inline-flex items-center rounded-md border border-white/15 overflow-hidden">
+              <button
+                onClick={() => setChartViewMode("top3")}
+                className={`px-2 py-1 text-xs transition-colors ${
+                  chartViewMode === "top3"
+                    ? "bg-violet-600 text-white"
+                    : "bg-transparent text-slate-300 hover:text-white"
+                }`}
+              >
+                Top 3
+              </button>
+              <button
+                onClick={() => setChartViewMode("all")}
+                className={`px-2 py-1 text-xs transition-colors ${
+                  chartViewMode === "all"
+                    ? "bg-violet-600 text-white"
+                    : "bg-transparent text-slate-300 hover:text-white"
+                }`}
+              >
+                All
+              </button>
+            </div>
+          )}
           <button
             onClick={exportDashboardJson}
             className="text-xs text-slate-300 hover:text-white border border-white/15 hover:border-white/30 px-2 py-1 rounded-md"
@@ -178,7 +206,9 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
             Print
           </button>
           <span className="text-xs text-violet-200 bg-violet-500/20 border border-violet-400/35 px-2 py-1 rounded-full">
-            {chartCount} chart{chartCount !== 1 ? "s" : ""}
+            {visibleCount}
+            {visibleCount !== chartCount ? ` of ${chartCount}` : ""} chart
+            {visibleCount !== 1 ? "s" : ""}
           </span>
         </div>
       </div>
@@ -242,9 +272,9 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
         )}
 
         {/* Charts grid */}
-        {charts.length > 0 && (
+        {visibleCharts.length > 0 && (
           <div className={`grid ${gridCols} gap-4`}>
-            {charts.map((chart, idx) => (
+            {visibleCharts.map((chart, idx) => (
               <div
                 key={idx}
                 className="bg-slate-950/50 border border-white/10 rounded-lg overflow-hidden"
