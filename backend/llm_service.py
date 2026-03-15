@@ -348,6 +348,23 @@ async def generate_dashboard(
                 "insights": "",
                 "error": "Invalid API key. Please check your GEMINI_API_KEY configuration."
             }
+        # Graceful degradation for quota/rate-limit style failures.
+        # Keeps the product usable using local deterministic templates.
+        quota_markers = [
+            "429",
+            "quota",
+            "resource_exhausted",
+            "rate limit",
+            "billing",
+        ]
+        if any(marker in error_msg.lower() for marker in quota_markers):
+            fallback = _get_mock_response(user_query)
+            fallback["insights"] = (
+                (fallback.get("insights") or "")
+                + "\n\nNote: Using local fallback analytics because the LLM quota is currently exceeded."
+            ).strip()
+            fallback["error"] = None
+            return fallback
         # For other errors, return a user-friendly message
         return {
             "charts": [],
