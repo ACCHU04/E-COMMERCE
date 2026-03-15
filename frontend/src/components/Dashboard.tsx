@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { ChatMessage } from "@/types";
 import { ChartRenderer } from "./ChartRenderer";
 import { InsightCard } from "./InsightCard";
@@ -55,11 +56,50 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
 
   const printDashboard = () => window.print();
 
+  const kpis = useMemo(() => {
+    if (!latestDashboard?.charts?.length) return [] as Array<{ label: string; value: string }>;
+
+    const charts = latestDashboard.charts;
+    const dataPoints = charts.reduce((acc, c) => acc + (c.data?.length || 0), 0);
+    const first = charts[0];
+    const rows = first.data || [];
+
+    const metricKey = first.y_column || first.values_column || null;
+    const dimensionKey = first.x_column || first.labels_column || null;
+
+    let totalMetric = 0;
+    if (metricKey) {
+      totalMetric = rows.reduce((sum, row) => {
+        const value = Number((row as Record<string, unknown>)[metricKey]);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+    }
+
+    const topRow = rows[0] as Record<string, unknown> | undefined;
+    const topLabel = dimensionKey && topRow ? String(topRow[dimensionKey] ?? "N/A") : "N/A";
+    const uniqueCategories = dimensionKey
+      ? new Set(rows.map((r) => String((r as Record<string, unknown>)[dimensionKey]))).size
+      : 0;
+
+    const metricLabel = metricKey || "value";
+    const isCurrency = /(revenue|sales|amount|price|cost|gmv)/i.test(metricLabel);
+    const metricValue = isCurrency
+      ? `$${totalMetric.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+      : totalMetric.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+    return [
+      { label: "Total Data Points", value: dataPoints.toLocaleString() },
+      { label: `Total ${metricLabel}`, value: metricValue },
+      { label: "Top Segment", value: topLabel },
+      { label: "Category Count", value: uniqueCategories.toLocaleString() },
+    ];
+  }, [latestDashboard]);
+
   if (isLoading && !latestDashboard) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <LoadingState variant="large" />
-        <p className="text-slate-400 text-sm">Generating your dashboard...</p>
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 min-h-[400px]">
+        <LoadingState variant="dashboard" />
+        <p className="text-slate-400 text-sm mt-4 text-center">Generating your dashboard...</p>
       </div>
     );
   }
@@ -147,6 +187,18 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
         {/* Insights card */}
         {insights && <InsightCard insight={insights} />}
 
+        {/* KPI cards */}
+        {!!kpis.length && (
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            {kpis.map((kpi) => (
+              <div key={kpi.label} className="bg-slate-950/70 border border-slate-800 rounded-lg p-3">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">{kpi.label}</p>
+                <p className="text-lg font-semibold text-slate-200 mt-1">{kpi.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Query plan and confidence */}
         {(typeof confidence === "number" || query_plan) && (
           <div className="bg-slate-950/70 border border-slate-800 rounded-lg p-3 space-y-2">
@@ -200,6 +252,12 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
                 <ChartRenderer chart={chart} />
               </div>
             ))}
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="mt-2">
+            <LoadingState variant="default" />
           </div>
         )}
       </div>

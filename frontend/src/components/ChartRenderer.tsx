@@ -47,6 +47,25 @@ const DARK_LAYOUT: Partial<Plotly.Layout> = {
 };
 
 export function ChartRenderer({ chart }: ChartRendererProps) {
+  const reasoning = useMemo(() => {
+    const x = chart.x_column || chart.labels_column || "dimension";
+    const y = chart.y_column || chart.values_column || "metric";
+
+    if (chart.chart_type === "line") {
+      return `Line chart selected because the query implies trend/time progression using ${x}.`;
+    }
+    if (chart.chart_type === "bar") {
+      return `Bar chart selected for category comparison between ${x} and ${y}.`;
+    }
+    if (chart.chart_type === "pie") {
+      return `Pie chart selected to show part-to-whole contribution by ${x}.`;
+    }
+    if (chart.chart_type === "scatter") {
+      return `Scatter chart selected to inspect correlation between ${x} and ${y}.`;
+    }
+    return `Chart selected based on detected data shape and metric intent.`;
+  }, [chart]);
+
   const { plotData, layout } = useMemo(() => {
     const { chart_type, data, x_column, y_column, color_column, labels_column, values_column } = chart;
 
@@ -182,6 +201,7 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
       {chart.description && (
         <p className="text-xs text-slate-500 px-2 pb-2">{chart.description}</p>
       )}
+      <p className="text-[11px] text-slate-600 px-2 pb-2">{reasoning}</p>
     </div>
   );
 }
