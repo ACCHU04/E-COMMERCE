@@ -29,6 +29,41 @@ export interface QueryResponse {
   sql_query: string;
   session_id: string;
   error: string | null;
+  confidence: number;
+  query_plan: QueryPlan | null;
+  clarification_needed: boolean;
+  clarification_question: string | null;
+  clarification_options: string[];
+  executive_summary: ExecutiveSummary | null;
+}
+
+export interface QueryPlan {
+  intent: string;
+  chart_strategy: string[];
+  assumptions: string[];
+  warnings: string[];
+}
+
+export interface ExecutiveSummary {
+  what_happened: string;
+  why_it_matters: string;
+  recommended_action: string;
+}
+
+export interface DatasetProfileColumn {
+  name: string;
+  inferred_type: string;
+  null_count: number;
+  distinct_count: number;
+}
+
+export interface DatasetProfile {
+  row_count: number;
+  column_count: number;
+  numeric_columns: string[];
+  categorical_columns: string[];
+  date_columns: string[];
+  columns: DatasetProfileColumn[];
 }
 
 export interface UploadResponse {
@@ -37,6 +72,7 @@ export interface UploadResponse {
   row_count: number;
   session_id: string;
   schema_info: ColumnInfo[];
+  dataset_profile: DatasetProfile | null;
 }
 
 export interface ChatMessage {
@@ -48,4 +84,10 @@ export interface ChatMessage {
   insights?: string;
   sql_query?: string;
   error?: string | null;
+  confidence?: number;
+  query_plan?: QueryPlan | null;
+  clarification_needed?: boolean;
+  clarification_question?: string | null;
+  clarification_options?: string[];
+  executive_summary?: ExecutiveSummary | null;
 }

@@ -103,6 +103,23 @@ export function ChatInterface({
                   }`}
                 >
                   <p>{msg.content}</p>
+                  {msg.clarification_needed && msg.clarification_question && (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-xs text-amber-300">{msg.clarification_question}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(msg.clarification_options || []).map((option) => (
+                          <button
+                            key={option}
+                            onClick={() => onSendMessage(option)}
+                            disabled={isLoading}
+                            className="text-xs px-2 py-1 rounded-md border border-amber-600/40 bg-amber-900/20 text-amber-200 hover:bg-amber-900/40 disabled:opacity-50"
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {msg.sql_query && (
                     <details className="mt-2">
                       <summary className="flex items-center gap-1 text-xs text-slate-500 cursor-pointer hover:text-slate-400">
@@ -146,6 +163,8 @@ export function ChatInterface({
           <button
             onClick={handleSubmit}
             disabled={isLoading || !input.trim()}
+            aria-label="Send message"
+            title="Send message"
             className="flex-shrink-0 p-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
           >
             <Send className="w-4 h-4" />

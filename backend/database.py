@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 from config import settings
-from models import ColumnInfo, SchemaResponse
+from models import ColumnInfo, SchemaResponse, DatasetProfile, DatasetProfileColumn
 
 # In-memory session storage for uploaded datasets
 _session_dbs: dict[str, str] = {}  # session_id -> db_path
@@ -108,6 +108,57 @@ def get_schema(session_id: str | None = None) -> SchemaResponse:
             columns=columns,
             sample_data=sample_rows,
             row_count=row_count
+        )
+    finally:
+        conn.close()
+
+
+def get_dataset_profile(session_id: str | None = None) -> DatasetProfile:
+    """Compute a lightweight profile for the active dataset."""
+    db_path = _get_db_path(session_id)
+    conn = sqlite3.connect(db_path)
+    try:
+        count_row = conn.execute("SELECT COUNT(*) FROM sales_data").fetchone()
+        row_count = count_row[0] if count_row else 0
+
+        type_cursor = conn.execute("PRAGMA table_info(sales_data)")
+        table_info = type_cursor.fetchall()
+
+        columns: list[DatasetProfileColumn] = []
+        numeric_columns: list[str] = []
+        categorical_columns: list[str] = []
+        date_columns: list[str] = []
+
+        for _, col_name, col_type, *_ in table_info:
+            null_row = conn.execute(
+                f'SELECT COUNT(*) FROM sales_data WHERE "{col_name}" IS NULL'
+            ).fetchone()
+            distinct_row = conn.execute(
+                f'SELECT COUNT(DISTINCT "{col_name}") FROM sales_data'
+            ).fetchone()
+
+            inferred = (col_type or "TEXT").upper()
+            if any(token in col_name.lower() for token in ["date", "month", "year"]) or "DATE" in inferred:
+                date_columns.append(col_name)
+            elif any(token in inferred for token in ["INT", "REAL", "NUM", "DEC", "FLOAT", "DOUBLE"]):
+                numeric_columns.append(col_name)
+            else:
+                categorical_columns.append(col_name)
+
+            columns.append(DatasetProfileColumn(
+                name=col_name,
+                inferred_type=inferred,
+                null_count=int(null_row[0] if null_row else 0),
+                distinct_count=int(distinct_row[0] if distinct_row else 0),
+            ))
+
+        return DatasetProfile(
+            row_count=row_count,
+            column_count=len(table_info),
+            numeric_columns=numeric_columns,
+            categorical_columns=categorical_columns,
+            date_columns=date_columns,
+            columns=columns,
         )
     finally:
         conn.close()

@@ -43,6 +43,12 @@ export default function Home() {
           insights: response.insights,
           sql_query: response.sql_query,
           error: response.error,
+          confidence: response.confidence,
+          query_plan: response.query_plan,
+          clarification_needed: response.clarification_needed,
+          clarification_question: response.clarification_question,
+          clarification_options: response.clarification_options,
+          executive_summary: response.executive_summary,
         };
         setMessages((prev) => [...prev, assistantMessage]);
       } catch (err: any) {
@@ -142,6 +148,17 @@ export default function Home() {
           {/* Left panel: Chat + Upload */}
           <div className="lg:col-span-1 flex flex-col gap-4">
             <FileUpload onUpload={handleUpload} isLoading={isLoading} />
+            {uploadInfo?.dataset_profile && (
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-medium text-slate-300">Dataset Profile</p>
+                <p className="text-xs text-slate-500">
+                  {uploadInfo.dataset_profile.row_count.toLocaleString()} rows, {uploadInfo.dataset_profile.column_count} columns
+                </p>
+                <p className="text-xs text-slate-400">
+                  Numeric: {uploadInfo.dataset_profile.numeric_columns.length} | Categorical: {uploadInfo.dataset_profile.categorical_columns.length} | Date-like: {uploadInfo.dataset_profile.date_columns.length}
+                </p>
+              </div>
+            )}
             <ChatInterface
               messages={messages}
               onSendMessage={handleSendQuery}
