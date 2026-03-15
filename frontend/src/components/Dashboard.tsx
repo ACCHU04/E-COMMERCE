@@ -97,31 +97,31 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
 
   if (isLoading && !latestDashboard) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 min-h-[400px]">
+      <div className="glass-panel p-6 min-h-[420px]">
         <LoadingState variant="dashboard" />
-        <p className="text-slate-400 text-sm mt-4 text-center">Generating your dashboard...</p>
+        <p className="text-slate-300 text-sm mt-4 text-center">Generating your dashboard...</p>
       </div>
     );
   }
 
   if (!latestDashboard) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col items-center justify-center min-h-[400px] gap-4 p-8">
-        <div className="p-4 bg-slate-800/60 rounded-2xl">
-          <BarChart3 className="w-10 h-10 text-slate-600" />
+      <div className="glass-panel flex flex-col items-center justify-center min-h-[420px] gap-4 p-8">
+        <div className="p-4 rounded-2xl bg-violet-500/15 border border-violet-400/25">
+          <BarChart3 className="w-10 h-10 text-violet-300" />
         </div>
         <div className="text-center max-w-sm">
-          <h2 className="text-slate-300 font-semibold text-lg mb-2">Your Dashboard</h2>
-          <p className="text-slate-500 text-sm leading-relaxed">
+          <h2 className="text-slate-100 font-head text-xl mb-2">Your Dashboard</h2>
+          <p className="text-slate-400 text-sm leading-relaxed">
             Ask a question in the chat to generate interactive charts. Try asking about
             revenue trends, product categories, or regional performance.
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-3 w-full max-w-sm mt-2">
-          {["📊 Bar Charts", "📈 Line Trends", "🥧 Pie Charts"].map((label) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-2xl mt-2">
+          {["Bar Charts", "Line Trends", "Pie Charts"].map((label) => (
             <div
               key={label}
-              className="text-center py-3 px-2 bg-slate-800/40 border border-slate-700/40 rounded-lg text-xs text-slate-500"
+              className="text-center py-3 px-2 bg-slate-900/60 border border-white/10 rounded-lg text-xs text-slate-300"
             >
               {label}
             </div>
@@ -135,7 +135,7 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
 
   if (error && charts.length === 0) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-8">
+      <div className="glass-panel p-8">
         <div className="flex items-start gap-3 bg-red-900/20 border border-red-800/40 rounded-lg p-4">
           <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
           <div>
@@ -151,33 +151,33 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
   const gridCols = chartCount === 1 ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2";
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+    <div className="glass-panel overflow-hidden">
       {/* Dashboard header */}
-      <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+      <div className="px-5 py-3.5 border-b border-white/10 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <BarChart3 className="w-4 h-4 text-blue-400" />
-          <span className="text-sm font-medium text-slate-300">Dashboard</span>
+          <BarChart3 className="w-4 h-4 text-violet-300" />
+          <span className="text-sm font-head font-semibold text-slate-100">Dashboard Intelligence</span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={exportDashboardJson}
-            className="text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 px-2 py-1 rounded-md"
+            className="text-xs text-slate-300 hover:text-white border border-white/15 hover:border-white/30 px-2 py-1 rounded-md"
           >
             JSON
           </button>
           <button
             onClick={exportDashboardCsv}
-            className="text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 px-2 py-1 rounded-md"
+            className="text-xs text-slate-300 hover:text-white border border-white/15 hover:border-white/30 px-2 py-1 rounded-md"
           >
             CSV
           </button>
           <button
             onClick={printDashboard}
-            className="text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 px-2 py-1 rounded-md"
+            className="text-xs text-slate-300 hover:text-white border border-white/15 hover:border-white/30 px-2 py-1 rounded-md"
           >
             Print
           </button>
-          <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded-full">
+          <span className="text-xs text-violet-200 bg-violet-500/20 border border-violet-400/35 px-2 py-1 rounded-full">
             {chartCount} chart{chartCount !== 1 ? "s" : ""}
           </span>
         </div>
@@ -189,11 +189,11 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
 
         {/* KPI cards */}
         {!!kpis.length && (
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 2xl:grid-cols-4 gap-3">
             {kpis.map((kpi) => (
-              <div key={kpi.label} className="bg-slate-950/70 border border-slate-800 rounded-lg p-3">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">{kpi.label}</p>
-                <p className="text-lg font-semibold text-slate-200 mt-1">{kpi.value}</p>
+              <div key={kpi.label} className="glass-metric p-3">
+                <p className="text-[10px] uppercase tracking-[0.08em] text-slate-400 font-head">{kpi.label}</p>
+                <p className="text-lg font-head font-semibold text-slate-100 mt-1">{kpi.value}</p>
               </div>
             ))}
           </div>
@@ -201,15 +201,15 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
 
         {/* Query plan and confidence */}
         {(typeof confidence === "number" || query_plan) && (
-          <div className="bg-slate-950/70 border border-slate-800 rounded-lg p-3 space-y-2">
+          <div className="bg-slate-900/70 border border-white/10 rounded-lg p-3 space-y-2">
             {typeof confidence === "number" && (
-              <p className="text-xs text-slate-400">
-                Confidence: <span className="text-slate-200 font-medium">{Math.round(confidence * 100)}%</span>
+              <p className="text-xs text-slate-300">
+                Confidence: <span className="text-violet-200 font-medium">{Math.round(confidence * 100)}%</span>
               </p>
             )}
             {query_plan?.intent && (
-              <p className="text-xs text-slate-400">
-                Intent: <span className="text-slate-200">{query_plan.intent}</span>
+              <p className="text-xs text-slate-300">
+                Intent: <span className="text-slate-100">{query_plan.intent}</span>
               </p>
             )}
             {!!query_plan?.warnings?.length && (
@@ -225,11 +225,11 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
 
         {/* Executive summary */}
         {executive_summary && (
-          <div className="bg-emerald-950/25 border border-emerald-900/40 rounded-lg p-3 space-y-2">
-            <p className="text-xs uppercase tracking-wide text-emerald-300">Executive Summary</p>
-            <p className="text-sm text-slate-200"><span className="text-emerald-300">What happened:</span> {executive_summary.what_happened}</p>
-            <p className="text-sm text-slate-200"><span className="text-emerald-300">Why it matters:</span> {executive_summary.why_it_matters}</p>
-            <p className="text-sm text-slate-200"><span className="text-emerald-300">Action:</span> {executive_summary.recommended_action}</p>
+          <div className="bg-gradient-to-br from-violet-500/15 to-cyan-500/10 border border-violet-400/30 rounded-lg p-3 space-y-2">
+            <p className="text-xs uppercase tracking-wide text-violet-200">Executive Summary</p>
+            <p className="text-sm text-slate-100"><span className="text-violet-200">What happened:</span> {executive_summary.what_happened}</p>
+            <p className="text-sm text-slate-100"><span className="text-violet-200">Why it matters:</span> {executive_summary.why_it_matters}</p>
+            <p className="text-sm text-slate-100"><span className="text-violet-200">Action:</span> {executive_summary.recommended_action}</p>
           </div>
         )}
 
@@ -247,7 +247,7 @@ export function Dashboard({ messages, latestDashboard, isLoading }: DashboardPro
             {charts.map((chart, idx) => (
               <div
                 key={idx}
-                className="bg-slate-950/60 border border-slate-800/80 rounded-lg overflow-hidden"
+                className="bg-slate-950/50 border border-white/10 rounded-lg overflow-hidden"
               >
                 <ChartRenderer chart={chart} />
               </div>

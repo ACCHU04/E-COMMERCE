@@ -20,6 +20,7 @@ const DARK_LAYOUT: Partial<Plotly.Layout> = {
   paper_bgcolor: "rgba(0,0,0,0)",
   plot_bgcolor: "rgba(15,23,42,0.4)",
   font: { color: "#94a3b8", family: "Inter, system-ui, sans-serif", size: 12 },
+  transition: { duration: 450, easing: "cubic-in-out" },
   xaxis: {
     gridcolor: "#1e293b",
     linecolor: "#334155",
@@ -39,6 +40,8 @@ const DARK_LAYOUT: Partial<Plotly.Layout> = {
     font: { color: "#94a3b8", size: 11 },
   },
   margin: { t: 40, b: 60, l: 60, r: 20 },
+  dragmode: "pan",
+  hovermode: "x unified",
   hoverlabel: {
     bgcolor: "#1e293b",
     bordercolor: "#3b82f6",
@@ -219,6 +222,7 @@ export function ChartRenderer({ chart }: ChartRendererProps) {
         layout={layout}
         config={{
           displaylogo: false,
+          displayModeBar: true,
           modeBarButtonsToRemove: ["lasso2d", "select2d"],
           responsive: true,
           toImageButtonOptions: {

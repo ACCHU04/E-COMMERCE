@@ -7,12 +7,29 @@ import { Dashboard } from "@/components/Dashboard";
 import { FileUpload } from "@/components/FileUpload";
 import { sendQuery, uploadCSV } from "@/lib/api";
 import { ChatMessage, UploadResponse } from "@/types";
-import { BarChart3, Sparkles } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  CalendarDays,
+  Download,
+  Files,
+  History,
+  LayoutDashboard,
+  Loader2,
+  LineChart,
+  Plus,
+  Search,
+  Settings,
+  Sparkles,
+} from "lucide-react";
+
+type ViewKey = "overview" | "analytics" | "reports" | "history" | "settings";
 
 export default function Home() {
   const [sessionId, setSessionId] = useState<string>(uuidv4());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [uploadInfo, setUploadInfo] = useState<UploadResponse | null>(null);
   const [queryHistory, setQueryHistory] = useState<string[]>([]);
 
@@ -26,7 +43,7 @@ export default function Home() {
     } catch {
       setQueryHistory([]);
     }
-  }, []);
+  }, [isExportingPdf]);
 
   const persistQueryHistory = (items: string[]) => {
     setQueryHistory(items);
@@ -149,87 +166,361 @@ export default function Home() {
     .reverse()
     .find((m) => m.role === "assistant" && m.charts && m.charts.length > 0);
 
+  const [activeView, setActiveView] = useState<ViewKey>("overview");
+
+  const sidebarItems = [
+    { key: "overview" as ViewKey, label: "Overview", icon: LayoutDashboard },
+    { key: "analytics" as ViewKey, label: "Analytics", icon: LineChart },
+    { key: "reports" as ViewKey, label: "Reports", icon: Files },
+    { key: "history" as ViewKey, label: "History", icon: History },
+    { key: "settings" as ViewKey, label: "Settings", icon: Settings },
+  ];
+
+  const activeSidebarItem = useMemo(
+    () => sidebarItems.find((s) => s.key === activeView) ?? sidebarItems[0],
+    [activeView]
+  );
+
+  const handleExportPdf = useCallback(async () => {
+    if (isExportingPdf) return;
+    const exportNode = document.getElementById("dashboard-export-region");
+    if (!exportNode) return;
+
+    setIsExportingPdf(true);
+    exportNode.classList.add("pdf-exporting");
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+
+      const canvas = await html2canvas(exportNode, {
+        backgroundColor: "#050818",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        windowWidth: exportNode.scrollWidth,
+        windowHeight: exportNode.scrollHeight,
+      });
+
+      const imageData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+        unit: "pt",
+        format: "a4",
+      });
+
+      const margin = 20;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const usableWidth = pageWidth - margin * 2;
+      const usableHeight = pageHeight - margin * 2;
+
+      const imageWidth = usableWidth;
+      const imageHeight = (canvas.height * imageWidth) / canvas.width;
+
+      let heightLeft = imageHeight;
+      let positionY = margin;
+
+      pdf.addImage(imageData, "PNG", margin, positionY, imageWidth, imageHeight, undefined, "FAST");
+      heightLeft -= usableHeight;
+
+      while (heightLeft > 0) {
+        positionY = heightLeft - imageHeight + margin;
+        pdf.addPage();
+        pdf.addImage(imageData, "PNG", margin, positionY, imageWidth, imageHeight, undefined, "FAST");
+        heightLeft -= usableHeight;
+      }
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      pdf.save(`dashboard-${timestamp}.pdf`);
+    } catch {
+      window.alert("PDF export failed. Please try again.");
+    } finally {
+      exportNode.classList.remove("pdf-exporting");
+      setIsExportingPdf(false);
+    }
+  }, []);
+
+  const exportSessionJson = useCallback(() => {
+    const payload = {
+      exported_at: new Date().toISOString(),
+      session_id: sessionId,
+      message_count: messages.length,
+      query_history: queryHistory,
+      messages,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `session-${sessionId.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [messages, queryHistory, sessionId]);
+
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <BarChart3 className="w-5 h-5 text-white" />
-            </div>
+    <div className="app-shell">
+      <aside className="left-rail py-4 px-2 flex flex-col items-center gap-2">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-[0_0_24px_rgba(124,58,237,0.45)] mb-2">
+          <BarChart3 className="w-5 h-5 text-white" />
+        </div>
+
+        {sidebarItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.label}
+              type="button"
+              title={item.label}
+              onClick={() => setActiveView(item.key)}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-all ${
+                activeView === item.key
+                  ? "border-violet-400/50 bg-violet-500/20 text-violet-200"
+                  : "border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/70"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+            </button>
+          );
+        })}
+
+        <div className="flex-1" />
+        <button
+          type="button"
+          title="Profile"
+          className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 text-white text-xs font-bold shadow-[0_0_16px_rgba(124,58,237,0.38)]"
+        >
+          A
+        </button>
+      </aside>
+
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <header className="h-16 border-b border-white/10 bg-slate-950/55 backdrop-blur-xl px-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
             <div>
-              <h1 className="text-lg font-bold text-white">AI Dashboard</h1>
-              <p className="text-xs text-slate-400">E-Commerce Intelligence</p>
+              <p className="text-[11px] text-slate-500">Dashboard / {activeSidebarItem.label}</p>
+              <h1 className="font-head text-base text-slate-100">AI Dashboard</h1>
+            </div>
+            <div className="hidden md:flex items-center gap-2 soft-pill rounded-lg px-3 py-1.5 text-xs min-w-56">
+              <Search className="w-3.5 h-3.5" />
+              Ask anything about your data...
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-800 px-3 py-1.5 rounded-full">
-              <Sparkles className="w-3 h-3 text-blue-400" />
+
+          <div className="flex items-center gap-2">
+            <span className="hidden lg:flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-400/10 border border-emerald-400/25 px-2.5 py-1 rounded-full">
+              <Activity className="w-3 h-3" />
+              Live
+            </span>
+            <span className="hidden md:flex items-center gap-1.5 text-xs soft-pill rounded-full px-3 py-1.5">
+              <Sparkles className="w-3 h-3 text-violet-300" />
               {uploadInfo ? `Custom: ${uploadInfo.columns.length} columns` : "Amazon Sales Data"}
             </span>
+            <span className="hidden md:flex items-center gap-1.5 text-xs soft-pill rounded-full px-3 py-1.5">
+              <CalendarDays className="w-3 h-3" />
+              Mar 2026
+            </span>
+            <button
+              onClick={handleExportPdf}
+              disabled={isExportingPdf}
+              className="hidden md:inline-flex text-xs text-slate-200 bg-slate-900/70 hover:bg-slate-800/80 border border-white/15 px-3 py-1.5 rounded-lg transition-colors items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isExportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              {isExportingPdf ? "Exporting..." : "Export PDF"}
+            </button>
             <button
               onClick={handleNewSession}
-              className="text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-lg transition-colors"
+              className="text-xs text-slate-200 bg-violet-500/25 hover:bg-violet-500/35 border border-violet-400/45 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5"
             >
-              New Session
+              <Plus className="w-3.5 h-3.5" />
+              New query
             </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
-          {/* Left panel: Chat + Upload */}
-          <div className="lg:col-span-1 flex flex-col gap-4">
-            <FileUpload onUpload={handleUpload} isLoading={isLoading} />
-            {uploadInfo?.dataset_profile && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
-                <p className="text-sm font-medium text-slate-300">Dataset Profile</p>
-                <p className="text-xs text-slate-500">
-                  {uploadInfo.dataset_profile.row_count.toLocaleString()} rows, {uploadInfo.dataset_profile.column_count} columns
-                </p>
-                <p className="text-xs text-slate-400">
-                  Numeric: {uploadInfo.dataset_profile.numeric_columns.length} | Categorical: {uploadInfo.dataset_profile.categorical_columns.length} | Date-like: {uploadInfo.dataset_profile.date_columns.length}
-                </p>
+        <main className="flex-1 overflow-y-auto p-4 md:p-5">
+          {activeView === "overview" && (
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+              <section className="xl:col-span-4 2xl:col-span-3 flex flex-col gap-4 flow-fade">
+                <FileUpload onUpload={handleUpload} isLoading={isLoading} />
+                {uploadInfo?.dataset_profile && (
+                  <div className="glass-panel p-4 space-y-2">
+                    <p className="text-sm font-semibold text-slate-100">Dataset Profile</p>
+                    <p className="text-xs text-slate-400">
+                      {uploadInfo.dataset_profile.row_count.toLocaleString()} rows, {uploadInfo.dataset_profile.column_count} columns
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Numeric: {uploadInfo.dataset_profile.numeric_columns.length} | Categorical: {uploadInfo.dataset_profile.categorical_columns.length} | Date-like: {uploadInfo.dataset_profile.date_columns.length}
+                    </p>
+                  </div>
+                )}
+
+                {!!queryHistory.length && (
+                  <div className="glass-panel p-4 space-y-2">
+                    <p className="text-sm font-semibold text-slate-100">Recent Questions</p>
+                    <div className="space-y-2">
+                      {queryHistory.slice(0, 5).map((q) => (
+                        <button
+                          key={q}
+                          onClick={() => handleSendQuery(q)}
+                          disabled={isLoading}
+                          className="w-full text-left text-xs text-slate-300 hover:text-white bg-slate-900/60 hover:bg-slate-800/70 border border-white/10 hover:border-white/20 px-2.5 py-2 rounded-lg disabled:opacity-50 transition-colors"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <ChatInterface
+                  messages={messages}
+                  onSendMessage={handleSendQuery}
+                  isLoading={isLoading}
+                  suggestedQueries={suggestedQueries}
+                />
+              </section>
+
+              <section id="dashboard-export-region" className="xl:col-span-8 2xl:col-span-9 flow-fade">
+                <Dashboard
+                  messages={messages}
+                  latestDashboard={latestDashboard}
+                  isLoading={isLoading}
+                />
+              </section>
+            </div>
+          )}
+
+          {activeView === "analytics" && (
+            <section id="dashboard-export-region" className="flow-fade space-y-4">
+              <div className="glass-panel p-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-head text-lg text-slate-100">Analytics Workspace</h2>
+                  <p className="text-xs text-slate-400">Focused view for analysis and export-ready visuals.</p>
+                </div>
+                <button
+                  onClick={handleExportPdf}
+                  disabled={isExportingPdf}
+                  className="text-xs text-slate-100 bg-violet-500/25 hover:bg-violet-500/35 border border-violet-400/45 px-3 py-2 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isExportingPdf ? "Exporting..." : "Export This View"}
+                </button>
               </div>
-            )}
-            {!!queryHistory.length && (
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
-                <p className="text-sm font-medium text-slate-300">Query History</p>
-                <div className="space-y-1.5">
-                  {queryHistory.slice(0, 5).map((q) => (
+              <Dashboard
+                messages={messages}
+                latestDashboard={latestDashboard}
+                isLoading={isLoading}
+              />
+            </section>
+          )}
+
+          {activeView === "reports" && (
+            <section className="flow-fade space-y-4">
+              <div className="glass-panel p-5">
+                <h2 className="font-head text-lg text-slate-100">Reports Center</h2>
+                <p className="text-sm text-slate-400 mt-1">Export your current session and dashboard artifacts.</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    onClick={exportSessionJson}
+                    className="text-xs text-slate-100 bg-slate-900/70 hover:bg-slate-800/80 border border-white/15 px-3 py-2 rounded-lg"
+                  >
+                    Download Session JSON
+                  </button>
+                  <button
+                    onClick={handleExportPdf}
+                    disabled={isExportingPdf}
+                    className="text-xs text-slate-100 bg-violet-500/25 hover:bg-violet-500/35 border border-violet-400/45 px-3 py-2 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isExportingPdf ? "Exporting..." : "Download Dashboard PDF"}
+                  </button>
+                </div>
+              </div>
+              <div id="dashboard-export-region">
+                <Dashboard
+                  messages={messages}
+                  latestDashboard={latestDashboard}
+                  isLoading={isLoading}
+                />
+              </div>
+            </section>
+          )}
+
+          {activeView === "history" && (
+            <section className="flow-fade grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="glass-panel p-4">
+                <h2 className="font-head text-lg text-slate-100">Query History</h2>
+                <p className="text-xs text-slate-400 mt-1">Replay previous prompts instantly.</p>
+                <div className="mt-4 space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                  {queryHistory.length === 0 && (
+                    <p className="text-xs text-slate-500">No queries yet.</p>
+                  )}
+                  {queryHistory.map((q) => (
                     <button
                       key={q}
-                      onClick={() => handleSendQuery(q)}
+                      onClick={() => {
+                        setActiveView("overview");
+                        handleSendQuery(q);
+                      }}
                       disabled={isLoading}
-                      className="w-full text-left text-xs text-slate-400 hover:text-slate-200 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 px-2.5 py-1.5 rounded-md disabled:opacity-50"
+                      className="w-full text-left text-xs text-slate-300 hover:text-white bg-slate-900/60 hover:bg-slate-800/70 border border-white/10 hover:border-white/20 px-3 py-2 rounded-lg disabled:opacity-50"
                     >
                       {q}
                     </button>
                   ))}
                 </div>
               </div>
-            )}
-            <ChatInterface
-              messages={messages}
-              onSendMessage={handleSendQuery}
-              isLoading={isLoading}
-              suggestedQueries={suggestedQueries}
-            />
-          </div>
 
-          {/* Right panel: Dashboard */}
-          <div className="lg:col-span-2">
-            <Dashboard
-              messages={messages}
-              latestDashboard={latestDashboard}
-              isLoading={isLoading}
-            />
-          </div>
-        </div>
-      </main>
+              <div className="glass-panel p-4">
+                <h2 className="font-head text-lg text-slate-100">Conversation Log</h2>
+                <p className="text-xs text-slate-400 mt-1">Latest chat context from this session.</p>
+                <div className="mt-4 space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                  {messages.length === 0 && <p className="text-xs text-slate-500">No messages yet.</p>}
+                  {messages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`rounded-lg border px-3 py-2 text-xs ${
+                        m.role === "user"
+                          ? "bg-violet-500/15 border-violet-400/25 text-violet-100"
+                          : "bg-slate-900/65 border-white/10 text-slate-200"
+                      }`}
+                    >
+                      <p className="uppercase tracking-wide text-[10px] opacity-70 mb-1">{m.role}</p>
+                      <p className="leading-relaxed">{m.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {activeView === "settings" && (
+            <section className="flow-fade">
+              <div className="glass-panel p-5 space-y-4">
+                <h2 className="font-head text-lg text-slate-100">Workspace Settings</h2>
+                <p className="text-sm text-slate-400">Quick controls for your dashboard workflow.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="glass-metric p-3">
+                    <p className="text-xs text-slate-300">Session ID</p>
+                    <p className="text-xs text-slate-500 mt-1 break-all">{sessionId}</p>
+                  </div>
+                  <div className="glass-metric p-3">
+                    <p className="text-xs text-slate-300">Messages</p>
+                    <p className="text-2xl font-head text-slate-100 mt-1">{messages.length}</p>
+                  </div>
+                  <div className="glass-metric p-3">
+                    <p className="text-xs text-slate-300">Saved Queries</p>
+                    <p className="text-2xl font-head text-slate-100 mt-1">{queryHistory.length}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
