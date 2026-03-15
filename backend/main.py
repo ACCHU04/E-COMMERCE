@@ -186,6 +186,107 @@ def _build_executive_summary(charts: list[ChartData], insights: str, query: str)
     )
 
 
+def _recommended_companion_types(chart_type: str) -> list[str]:
+    normalized = chart_type.lower()
+    if normalized in {"bar", "horizontal_bar", "stacked_bar"}:
+        return ["horizontal_bar", "stacked_bar", "line", "area", "pie", "donut", "scatter"]
+    if normalized in {"line", "area"}:
+        return ["area", "line", "bar", "scatter", "pie", "donut"]
+    if normalized in {"pie", "donut"}:
+        return ["donut", "pie", "bar", "horizontal_bar"]
+    if normalized == "scatter":
+        return ["line", "bar", "area"]
+    if normalized == "heatmap":
+        return ["bar", "stacked_bar", "line"]
+    return ["bar", "line", "pie", "scatter"]
+
+
+def _build_chart_variant(base: ChartData, chart_type: str) -> ChartData | None:
+    x_col = base.x_column or base.labels_column
+    y_col = base.y_column or base.values_column
+    labels_col = base.labels_column or base.x_column
+    values_col = base.values_column or base.y_column
+
+    if chart_type in {"bar", "line", "scatter", "area", "horizontal_bar", "stacked_bar"}:
+        if not x_col or not y_col:
+            return None
+        return ChartData(
+            chart_type=chart_type,
+            title=f"{base.title} ({chart_type.replace('_', ' ').title()} View)",
+            data=base.data,
+            x_column=x_col,
+            y_column=y_col,
+            color_column=base.color_column,
+            labels_column=None,
+            values_column=None,
+            description=base.description,
+        )
+
+    if chart_type in {"pie", "donut"}:
+        if not labels_col or not values_col:
+            return None
+        return ChartData(
+            chart_type=chart_type,
+            title=f"{base.title} ({chart_type.title()} View)",
+            data=base.data,
+            x_column=None,
+            y_column=None,
+            color_column=base.color_column,
+            labels_column=labels_col,
+            values_column=values_col,
+            description=base.description,
+        )
+
+    if chart_type == "heatmap":
+        if not x_col or not y_col:
+            return None
+        return ChartData(
+            chart_type=chart_type,
+            title=f"{base.title} (Heatmap View)",
+            data=base.data,
+            x_column=x_col,
+            y_column=y_col,
+            color_column=base.color_column,
+            labels_column=None,
+            values_column=values_col,
+            description=base.description,
+        )
+
+    return None
+
+
+def _expand_chart_recommendations(charts: list[ChartData], max_total: int = 6) -> list[ChartData]:
+    if not charts:
+        return []
+
+    expanded: list[ChartData] = []
+    seen_keys: set[tuple[str, str | None, str | None, str | None, str | None]] = set()
+
+    for base in charts:
+        candidate_types = [base.chart_type] + _recommended_companion_types(base.chart_type)
+        for chart_type in candidate_types:
+            variant = _build_chart_variant(base, chart_type)
+            if not variant:
+                continue
+
+            dedupe_key = (
+                variant.chart_type,
+                variant.x_column,
+                variant.y_column,
+                variant.labels_column,
+                variant.values_column,
+            )
+            if dedupe_key in seen_keys:
+                continue
+
+            seen_keys.add(dedupe_key)
+            expanded.append(variant)
+            if len(expanded) >= max_total:
+                return expanded
+
+    return expanded
+
+
 @app.on_event("startup")
 async def startup():
     init_default_db()
@@ -390,13 +491,15 @@ async def api_query(request: QueryRequest):
     history.append({"role": "assistant", "content": insights})
     _conversation_history[session_id] = history[-20:]  # Keep last 10 exchanges
 
+    expanded_charts = _expand_chart_recommendations(executed_charts)
+
     error_msg = None
-    if not executed_charts:
+    if not expanded_charts:
         error_msg = "No charts could be generated for this query. Try rephrasing or asking a different question."
 
     chart_strategy = [
         f"{chart.chart_type} chart: {chart.title}"
-        for chart in executed_charts
+        for chart in expanded_charts
     ]
     assumptions = []
     if re.search(r"\bnow\b|\bsame\b|\bfilter\b", request.query.lower()):
@@ -409,15 +512,22 @@ async def api_query(request: QueryRequest):
         confidence = min(confidence, 0.35)
     confidence = max(0.05, round(confidence, 2))
 
-    if executed_charts:
+    response_insights = insights
+    if expanded_charts and len(expanded_charts) > len(executed_charts):
+        response_insights = (
+            f"{insights} Added {len(expanded_charts) - len(executed_charts)} companion chart recommendations "
+            "to show this answer in multiple graph views."
+        ).strip()
+
+    if expanded_charts:
         _session_last_dashboard[session_id] = {
-            "charts": executed_charts,
+            "charts": expanded_charts,
             "sql_query": last_sql,
         }
 
     return QueryResponse(
-        charts=executed_charts,
-        insights=insights,
+        charts=expanded_charts,
+        insights=response_insights,
         sql_query=last_sql,
         session_id=session_id,
         error=error_msg,
@@ -428,7 +538,7 @@ async def api_query(request: QueryRequest):
             assumptions=assumptions,
             warnings=warnings,
         ),
-        executive_summary=_build_executive_summary(executed_charts, insights, request.query),
+        executive_summary=_build_executive_summary(expanded_charts, response_insights, request.query),
     )
 
 
