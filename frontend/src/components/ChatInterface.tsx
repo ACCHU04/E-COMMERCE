@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { ChatMessage } from "@/types";
-import { Send, Bot, User, Code } from "lucide-react";
+import { Send, Bot, User, Code, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { LoadingState } from "./LoadingState";
 
 interface ChatInterfaceProps {
@@ -18,6 +18,14 @@ const EXAMPLE_QUERIES = [
   "Compare average discount % vs rating across categories",
 ];
 
+const SPEECH_LANGUAGES = [
+  { label: "English (US)", value: "en-US" },
+  { label: "English (UK)", value: "en-GB" },
+  { label: "Hindi", value: "hi-IN" },
+  { label: "Tamil", value: "ta-IN" },
+  { label: "Telugu", value: "te-IN" },
+];
+
 export function ChatInterface({
   messages,
   onSendMessage,
@@ -25,11 +33,146 @@ export function ChatInterface({
   suggestedQueries,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [speechLanguage, setSpeechLanguage] = useState("en-US");
+  const [autoSendVoice, setAutoSendVoice] = useState(true);
+  const [ttsSupported, setTtsSupported] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const speechBaseInputRef = useRef("");
+  const latestInputRef = useRef("");
+  const isLoadingRef = useRef(isLoading);
+  const onSendRef = useRef(onSendMessage);
+  const speechFinalRef = useRef("");
+  const lastSpokenMessageIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    latestInputRef.current = input;
+  }, [input]);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
+
+  useEffect(() => {
+    onSendRef.current = onSendMessage;
+  }, [onSendMessage]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setTtsSupported("speechSynthesis" in window);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      setSpeechSupported(false);
+      return;
+    }
+
+    setSpeechSupported(true);
+    const recognition = new SpeechRecognitionCtor();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = speechLanguage;
+
+    recognition.onstart = () => {
+      setSpeechError(null);
+      setIsListening(true);
+      speechBaseInputRef.current = latestInputRef.current.trim();
+      speechFinalRef.current = "";
+    };
+
+    recognition.onresult = (event: any) => {
+      let interimTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const chunk = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          speechFinalRef.current += ` ${chunk}`;
+        } else {
+          interimTranscript += chunk;
+        }
+      }
+
+      const base = speechBaseInputRef.current;
+      const nextVoice = `${speechFinalRef.current} ${interimTranscript}`.trim();
+      const next = base ? `${base} ${nextVoice}` : nextVoice;
+      setInput(next.trimStart());
+    };
+
+    recognition.onerror = (event: any) => {
+      setSpeechError(`Voice input error: ${event.error}`);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+
+      const spokenText = speechFinalRef.current.trim();
+      if (autoSendVoice && spokenText && !isLoadingRef.current) {
+        const base = speechBaseInputRef.current;
+        const finalMessage = base ? `${base} ${spokenText}` : spokenText;
+        onSendRef.current(finalMessage.trim());
+        setInput("");
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.stop();
+    };
+  }, [autoSendVoice, speechLanguage]);
+
+  const speakMessage = (text: string) => {
+    if (!ttsSupported || typeof window === "undefined" || !text.trim()) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = speechLanguage;
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  useEffect(() => {
+    if (!autoSpeak || !ttsSupported || messages.length === 0) return;
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant" && !!m.content?.trim());
+    if (!lastAssistant) return;
+    if (lastSpokenMessageIdRef.current === lastAssistant.id) return;
+
+    lastSpokenMessageIdRef.current = lastAssistant.id;
+    speakMessage(lastAssistant.content);
+  }, [messages, autoSpeak, ttsSupported, speechLanguage]);
+
+  const handleVoiceToggle = () => {
+    if (!speechSupported || !recognitionRef.current) {
+      setSpeechError("Voice input is not supported in this browser.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    try {
+      recognitionRef.current.start();
+    } catch {
+      setSpeechError("Unable to start voice input. Please allow microphone access.");
+    }
+  };
 
   const handleSubmit = () => {
     const trimmed = input.trim();
@@ -53,6 +196,15 @@ export function ChatInterface({
       <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2 bg-slate-950/35">
         <Bot className="w-4 h-4 text-violet-300" />
         <span className="text-sm font-head font-semibold text-slate-100">Chat with your data</span>
+        <button
+          onClick={() => setAutoSpeak((v) => !v)}
+          disabled={!ttsSupported}
+          className="ml-auto inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-white/10 text-slate-300 hover:text-white disabled:opacity-50"
+          title={autoSpeak ? "Disable auto voice replies" : "Enable auto voice replies"}
+        >
+          {autoSpeak ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+          {autoSpeak ? "Voice On" : "Voice Off"}
+        </button>
       </div>
 
       {/* Messages */}
@@ -134,6 +286,14 @@ export function ChatInterface({
                       </pre>
                     </details>
                   )}
+                  {msg.role === "assistant" && ttsSupported && (
+                    <button
+                      onClick={() => speakMessage(msg.content)}
+                      className="mt-2 inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white"
+                    >
+                      <Volume2 className="w-3 h-3" /> Read aloud
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -154,6 +314,33 @@ export function ChatInterface({
 
       {/* Input */}
       <div className="p-3 border-t border-white/10 bg-slate-950/35">
+        <div className="mb-2 flex flex-wrap gap-2 items-center">
+          <label className="text-[11px] text-slate-400">Voice language</label>
+          <select
+            value={speechLanguage}
+            onChange={(e) => setSpeechLanguage(e.target.value)}
+            aria-label="Voice language"
+            title="Voice language"
+            className="bg-slate-900/80 border border-white/10 rounded-md px-2 py-1 text-xs text-slate-200"
+          >
+            {SPEECH_LANGUAGES.map((lang) => (
+              <option key={lang.value} value={lang.value}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => setAutoSendVoice((v) => !v)}
+            className={`text-[11px] px-2 py-1 rounded-md border ${
+              autoSendVoice
+                ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-200"
+                : "border-white/10 text-slate-300"
+            }`}
+          >
+            {autoSendVoice ? "Auto-send On" : "Auto-send Off"}
+          </button>
+        </div>
         <div className="flex gap-2 items-end">
           <textarea
             value={input}
@@ -165,6 +352,19 @@ export function ChatInterface({
             className="flex-1 resize-none bg-slate-900/80 text-slate-100 placeholder-slate-500 border border-white/10 focus:border-violet-400/65 focus:outline-none rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50"
           />
           <button
+            onClick={handleVoiceToggle}
+            disabled={isLoading || !speechSupported}
+            aria-label={isListening ? "Stop voice input" : "Start voice input"}
+            title={isListening ? "Stop voice input" : "Start voice input"}
+            className={`flex-shrink-0 p-2.5 border rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              isListening
+                ? "bg-rose-500/20 border-rose-400/60 text-rose-200"
+                : "bg-slate-900/80 border-white/10 text-slate-300 hover:text-slate-100"
+            }`}
+          >
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+          <button
             onClick={handleSubmit}
             disabled={isLoading || !input.trim()}
             aria-label="Send message"
@@ -174,6 +374,7 @@ export function ChatInterface({
             <Send className="w-4 h-4" />
           </button>
         </div>
+        {speechError && <p className="text-xs text-rose-300 mt-1.5 pl-1">{speechError}</p>}
         <p className="text-xs text-slate-400 mt-1.5 pl-1">Press Enter to send, Shift+Enter for new line</p>
       </div>
     </div>
