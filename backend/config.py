@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-flash-latest"
+    gemini_fallback_models: str = "models/gemini-flash-latest,gemini-2.0-flash,models/gemini-2.0-flash,gemini-2.5-flash"
     db_path: str = "ecommerce.db"
     data_dir: str = str(Path(__file__).parent.parent / "data")
     default_csv: str = "amazon_sales.csv"

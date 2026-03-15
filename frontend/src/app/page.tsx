@@ -45,11 +45,14 @@ export default function Home() {
           error: response.error,
         };
         setMessages((prev) => [...prev, assistantMessage]);
-      } catch (err) {
+      } catch (err: any) {
+        const detail = err?.response?.data?.detail || err?.message;
         const errorMessage: ChatMessage = {
           id: uuidv4(),
           role: "assistant",
-          content: "Failed to connect to the backend. Please ensure the API server is running.",
+          content: detail
+            ? `Query failed: ${detail}`
+            : "Failed to connect to the backend. Please ensure the API server is running.",
           timestamp: new Date(),
           error: "Connection error",
         };
@@ -76,11 +79,14 @@ export default function Home() {
         timestamp: new Date(),
       };
       setMessages([systemMessage]);
-    } catch {
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
       const errorMessage: ChatMessage = {
         id: uuidv4(),
         role: "assistant",
-        content: "Failed to upload the CSV file. Please ensure it is a valid CSV file.",
+        content: detail
+          ? `CSV upload failed: ${detail}`
+          : "Failed to upload the CSV file. Please ensure it is a valid CSV file.",
         timestamp: new Date(),
         error: "Upload error",
       };

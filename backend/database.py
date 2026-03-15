@@ -35,12 +35,35 @@ def load_csv_for_session(csv_path: str, session_id: str) -> SchemaResponse:
 
 def _load_csv_to_db(csv_path: str, db_path: str, table_name: str) -> None:
     """Load CSV file into a SQLite database table."""
-    df = pd.read_csv(csv_path)
+    df = _read_csv_with_fallbacks(csv_path)
+    if df.empty:
+        raise ValueError("CSV file is empty")
     # Normalize column names: lowercase, replace spaces with underscores
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     conn = sqlite3.connect(db_path)
     df.to_sql(table_name, conn, if_exists="replace", index=False)
     conn.close()
+
+
+def _read_csv_with_fallbacks(csv_path: str) -> pd.DataFrame:
+    """Read CSVs with common encoding/delimiter fallbacks for user-uploaded files."""
+    encodings = ["utf-8", "utf-8-sig", "cp1252", "latin-1"]
+    read_attempts = [
+        {},
+        {"sep": None, "engine": "python"},
+    ]
+    last_error: Exception | None = None
+
+    for encoding in encodings:
+        for attempt in read_attempts:
+            try:
+                return pd.read_csv(csv_path, encoding=encoding, **attempt)
+            except (UnicodeDecodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
+                last_error = exc
+
+    raise ValueError(
+        "Unable to read CSV. Please upload a valid CSV encoded as UTF-8, UTF-8 with BOM, CP1252, or Latin-1."
+    ) from last_error
 
 
 def execute_query(sql: str, session_id: str | None = None) -> list[dict[str, Any]]:

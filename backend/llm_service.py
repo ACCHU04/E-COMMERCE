@@ -270,20 +270,37 @@ async def generate_dashboard(
         import google.generativeai as genai
         genai.configure(api_key=settings.gemini_api_key)
 
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=SYSTEM_PROMPT,
-        )
-
         prompt = _build_user_prompt(
             user_query,
             schema_context,
             conversation_history or []
         )
 
-        response = model.generate_content(prompt)
-        raw_text = response.text
-        return _parse_llm_response(raw_text)
+        configured_fallbacks = [
+            m.strip() for m in settings.gemini_fallback_models.split(",") if m.strip()
+        ]
+        model_candidates: list[str] = []
+        for candidate in [settings.gemini_model, *configured_fallbacks]:
+            if candidate not in model_candidates:
+                model_candidates.append(candidate)
+
+        last_error: Exception | None = None
+        for model_name in model_candidates:
+            try:
+                model = genai.GenerativeModel(
+                    model_name=model_name,
+                    system_instruction=SYSTEM_PROMPT,
+                )
+                response = model.generate_content(prompt)
+                raw_text = response.text
+                return _parse_llm_response(raw_text)
+            except Exception as model_error:
+                last_error = model_error
+                continue
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("No Gemini models are configured")
 
     except Exception as e:
         error_msg = str(e)

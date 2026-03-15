@@ -78,7 +78,16 @@ cp .env.example backend/.env
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# macOS / Linux
+source venv/bin/activate
+
+# Windows PowerShell
+.\venv\Scripts\Activate.ps1
+
+# Windows Command Prompt
+venv\Scripts\activate.bat
+
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
