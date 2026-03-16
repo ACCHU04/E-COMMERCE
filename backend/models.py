@@ -86,5 +86,6 @@ class UploadResponse(BaseModel):
     columns: list[str]
     row_count: int
     session_id: str
+    source_mode: str = "uploaded"  # uploaded | live | mock
     schema_info: list[ColumnInfo] = []
     dataset_profile: Optional[DatasetProfile] = None

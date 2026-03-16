@@ -600,6 +600,7 @@ async def api_upload(file: UploadFile = File(...)):
             columns=[col.name for col in schema.columns],
             row_count=schema.row_count,
             session_id=session_id,
+            source_mode="uploaded",
             schema_info=schema.columns,
             dataset_profile=get_dataset_profile(session_id),
         )
@@ -635,6 +636,7 @@ async def api_amazon_fetch(request: AmazonFetchRequest):
             columns=[col.name for col in schema.columns],
             row_count=schema.row_count,
             session_id=session_id,
+            source_mode=source_mode,
             schema_info=schema.columns,
             dataset_profile=get_dataset_profile(session_id),
         )

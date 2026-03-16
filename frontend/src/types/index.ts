@@ -71,6 +71,7 @@ export interface UploadResponse {
   columns: string[];
   row_count: number;
   session_id: string;
+  source_mode: "uploaded" | "live" | "mock";
   schema_info: ColumnInfo[];
   dataset_profile: DatasetProfile | null;
 }

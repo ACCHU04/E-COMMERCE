@@ -147,7 +147,7 @@ export default function Home() {
       setSessionId(info.session_id);
       setMessages([]);
 
-      const sourceHint = /mock/i.test(info.message)
+      const sourceHint = info.source_mode === "mock"
         ? " (using mock fallback because RapidAPI key/quota is unavailable)"
         : "";
 
@@ -216,6 +216,34 @@ export default function Home() {
     () => sidebarItems.find((s) => s.key === activeView) ?? sidebarItems[0],
     [activeView]
   );
+
+  const sourceBadge = useMemo(() => {
+    if (!uploadInfo) {
+      return {
+        label: "Default Dataset",
+        className: "text-slate-300 bg-slate-700/25 border-slate-500/35",
+      };
+    }
+
+    if (uploadInfo.source_mode === "live") {
+      return {
+        label: "Live API",
+        className: "text-emerald-300 bg-emerald-400/10 border-emerald-400/25",
+      };
+    }
+
+    if (uploadInfo.source_mode === "mock") {
+      return {
+        label: "Mock API",
+        className: "text-amber-300 bg-amber-400/10 border-amber-400/25",
+      };
+    }
+
+    return {
+      label: "Uploaded File",
+      className: "text-cyan-300 bg-cyan-400/10 border-cyan-400/25",
+    };
+  }, [uploadInfo]);
 
   const handleExportPdf = useCallback(async () => {
     if (isExportingPdf) return;
@@ -348,9 +376,9 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="hidden lg:flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-400/10 border border-emerald-400/25 px-2.5 py-1 rounded-full">
+            <span className={`hidden lg:flex items-center gap-1.5 text-xs border px-2.5 py-1 rounded-full ${sourceBadge.className}`}>
               <Activity className="w-3 h-3" />
-              Live
+              {sourceBadge.label}
             </span>
             <span className="hidden md:flex items-center gap-1.5 text-xs soft-pill rounded-full px-3 py-1.5">
               <Sparkles className="w-3 h-3 text-violet-300" />
