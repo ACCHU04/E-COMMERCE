@@ -149,29 +149,77 @@ def _normalize_dashboard_response(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _get_mock_response(user_query: str) -> dict:
-    """Return a mock response when no API key is configured."""
+def _get_mock_response(user_query: str, schema_context: str = DEFAULT_SCHEMA_CONTEXT) -> dict:
+    """Return a deterministic fallback response when LLM is unavailable."""
     query_lower = user_query.lower()
+    schema_lower = schema_context.lower()
 
-    if any(word in query_lower for word in ["top", "best", "highest", "most sold", "most revenue"]):
+    has_product_title = "product_title" in schema_lower
+    has_is_prime = "is_prime" in schema_lower
+
+    product_dimension = "product_title" if has_product_title else "product_id"
+    top_n = 10 if "top 10" in query_lower else 5
+
+    if any(word in query_lower for word in ["review", "review_count", "review count"]) and any(
+        word in query_lower for word in ["top", "best", "highest"]
+    ):
+        return {
+            "charts": [
+                {
+                    "chart_type": "horizontal_bar",
+                    "title": f"Top {top_n} Products by Review Count",
+                    "sql": f"SELECT {product_dimension}, MAX(review_count) AS review_count FROM sales_data GROUP BY {product_dimension} ORDER BY review_count DESC LIMIT {top_n}",
+                    "x_column": product_dimension,
+                    "y_column": "review_count",
+                    "color_column": None,
+                    "labels_column": None,
+                    "values_column": None,
+                    "description": "Highest-reviewed products ranked by review volume"
+                }
+            ],
+            "insights": "This view ranks products by review_count so you can quickly identify high-engagement items.",
+            "error": None
+        }
+
+    if "compare" in query_lower and "average" in query_lower and "price" in query_lower:
+        if has_is_prime and "prime" in query_lower:
+            return {
+                "charts": [
+                    {
+                        "chart_type": "bar",
+                        "title": "Average Price: Prime vs Non-Prime",
+                        "sql": "SELECT CASE WHEN is_prime = 1 THEN 'Prime' ELSE 'Non-Prime' END AS prime_status, ROUND(AVG(price), 2) AS avg_price, ROUND(AVG(review_count), 2) AS avg_review_count FROM sales_data GROUP BY prime_status ORDER BY avg_price DESC",
+                        "x_column": "prime_status",
+                        "y_column": "avg_price",
+                        "color_column": None,
+                        "labels_column": None,
+                        "values_column": None,
+                        "description": "Comparison of average price and review volume for Prime vs Non-Prime products"
+                    }
+                ],
+                "insights": "Prime status comparison reveals pricing and review behavior differences across listing types.",
+                "error": None
+            }
+
         return {
             "charts": [
                 {
                     "chart_type": "bar",
-                    "title": "Top 5 Product Categories by Revenue",
-                    "sql": "SELECT product_category, ROUND(SUM(total_revenue), 2) AS total_revenue FROM sales_data GROUP BY product_category ORDER BY total_revenue DESC LIMIT 5",
+                    "title": "Average Price by Product Category",
+                    "sql": "SELECT product_category, ROUND(AVG(price), 2) AS avg_price FROM sales_data GROUP BY product_category ORDER BY avg_price DESC",
                     "x_column": "product_category",
-                    "y_column": "total_revenue",
+                    "y_column": "avg_price",
                     "color_column": None,
                     "labels_column": None,
                     "values_column": None,
-                    "description": "Top 5 product categories ranked by total revenue"
+                    "description": "Average price comparison across categories"
                 }
             ],
-            "insights": "This chart highlights the top-performing product categories by total revenue. Electronics and Fashion typically dominate, driven by higher unit prices and strong demand.",
+            "insights": "This comparison highlights which categories are positioned at higher average price points.",
             "error": None
         }
-    elif any(word in query_lower for word in ["month", "trend", "time", "revenue over"]):
+
+    if any(word in query_lower for word in ["month", "trend", "time", "revenue over"]):
         return {
             "charts": [
                 {
@@ -186,10 +234,11 @@ def _get_mock_response(user_query: str) -> dict:
                     "description": "Monthly total revenue from January 2022 to December 2023"
                 }
             ],
-            "insights": "This chart shows the monthly revenue trend over the two-year period. Look for seasonal patterns and growth trends to identify peak sales periods.",
+            "insights": "This chart shows monthly revenue direction and possible seasonality.",
             "error": None
         }
-    elif any(word in query_lower for word in ["category", "product", "department"]):
+
+    if any(word in query_lower for word in ["category", "product", "department"]):
         return {
             "charts": [
                 {
@@ -218,7 +267,8 @@ def _get_mock_response(user_query: str) -> dict:
             "insights": "Electronics typically drives the highest revenue due to higher price points, while Fashion shows strong volume. The pie chart reveals the proportional contribution of each category.",
             "error": None
         }
-    elif any(word in query_lower for word in ["region", "geographic", "location", "country"]):
+
+    if any(word in query_lower for word in ["region", "geographic", "location", "country"]):
         return {
             "charts": [
                 {
@@ -236,7 +286,8 @@ def _get_mock_response(user_query: str) -> dict:
             "insights": "North America and Europe typically lead in total revenue, while emerging markets like Asia show strong growth potential.",
             "error": None
         }
-    elif any(word in query_lower for word in ["payment", "method", "credit", "upi", "paypal"]):
+
+    if any(word in query_lower for word in ["payment", "method", "credit", "upi", "paypal"]):
         return {
             "charts": [
                 {
@@ -254,7 +305,8 @@ def _get_mock_response(user_query: str) -> dict:
             "insights": "Credit Card and Debit Card dominate transactions, while digital wallets like UPI and PayPal are growing. Understanding payment preferences helps optimize checkout experience.",
             "error": None
         }
-    elif any(word in query_lower for word in ["discount", "rating", "scatter", "correlation"]):
+
+    if any(word in query_lower for word in ["discount", "rating", "scatter", "correlation"]):
         return {
             "charts": [
                 {
@@ -272,24 +324,24 @@ def _get_mock_response(user_query: str) -> dict:
             "insights": "Categories with higher discounts don't necessarily have lower ratings, suggesting discount strategy is not harming perceived product quality.",
             "error": None
         }
-    else:
-        return {
-            "charts": [
-                {
-                    "chart_type": "bar",
-                    "title": "Total Revenue by Product Category",
-                    "sql": "SELECT product_category, ROUND(SUM(total_revenue), 2) AS total_revenue FROM sales_data GROUP BY product_category ORDER BY total_revenue DESC",
-                    "x_column": "product_category",
-                    "y_column": "total_revenue",
-                    "color_column": None,
-                    "labels_column": None,
-                    "values_column": None,
-                    "description": "Total revenue aggregated by product category"
-                }
-            ],
-            "insights": "This overview shows revenue distribution across product categories. Electronics and Fashion typically lead in total sales value.",
-            "error": None
-        }
+
+    return {
+        "charts": [
+            {
+                "chart_type": "bar",
+                "title": "Top 5 Product Categories by Revenue",
+                "sql": "SELECT product_category, ROUND(SUM(total_revenue), 2) AS total_revenue FROM sales_data GROUP BY product_category ORDER BY total_revenue DESC LIMIT 5",
+                "x_column": "product_category",
+                "y_column": "total_revenue",
+                "color_column": None,
+                "labels_column": None,
+                "values_column": None,
+                "description": "Top 5 product categories ranked by total revenue"
+            }
+        ],
+        "insights": "This overview highlights top categories by revenue and is a solid starting point for deeper comparisons.",
+        "error": None
+    }
 
 
 async def generate_dashboard(
@@ -302,7 +354,7 @@ async def generate_dashboard(
     Falls back to mock mode if no API key is set.
     """
     if settings.mock_mode or not settings.gemini_api_key:
-        return _get_mock_response(user_query)
+        return _get_mock_response(user_query, schema_context)
 
     try:
         import google.generativeai as genai
@@ -358,7 +410,7 @@ async def generate_dashboard(
             "billing",
         ]
         if any(marker in error_msg.lower() for marker in quota_markers):
-            fallback = _get_mock_response(user_query)
+            fallback = _get_mock_response(user_query, schema_context)
             fallback["insights"] = (
                 (fallback.get("insights") or "")
                 + "\n\nNote: Using local fallback analytics because the LLM quota is currently exceeded."
