@@ -11,6 +11,8 @@ class AmazonFetchRequest(BaseModel):
     category: str = "electronics"
     country: str = "US"
     limit: int = 20
+    session_id: Optional[str] = None
+    merge_into_session: bool = True
 
 
 class ColumnInfo(BaseModel):

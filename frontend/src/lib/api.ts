@@ -42,12 +42,16 @@ export async function uploadCSV(file: File): Promise<UploadResponse> {
 export async function fetchAmazonData(
   category: string,
   country = "US",
-  limit = 20
+  limit = 20,
+  sessionId?: string,
+  mergeIntoSession = true,
 ): Promise<UploadResponse> {
   const { data } = await api.post<UploadResponse>("/api/amazon/fetch", {
     category,
     country,
     limit,
+    session_id: sessionId,
+    merge_into_session: mergeIntoSession,
   });
   return data;
 }

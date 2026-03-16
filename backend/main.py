@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from models import AmazonFetchRequest, QueryRequest, QueryResponse, SchemaResponse, UploadResponse, ChartData, QueryPlan, ExecutiveSummary
-from database import init_default_db, execute_query, get_schema, load_csv_for_session, load_records_for_session, get_dataset_profile
+from database import init_default_db, execute_query, get_schema, load_csv_for_session, load_records_for_session, merge_records_into_session, get_dataset_profile
 from llm_service import generate_dashboard, repair_sql_query, DEFAULT_SCHEMA_CONTEXT
 from query_parser import validate_sql, validate_sql_columns, clean_sql
 from chart_recommender import recommend_chart
@@ -615,7 +615,8 @@ async def api_upload(file: UploadFile = File(...)):
 @app.post("/api/amazon/fetch", response_model=UploadResponse)
 async def api_amazon_fetch(request: AmazonFetchRequest):
     """Fetch Amazon best-seller data via RapidAPI (or mock fallback) and load it as a session dataset."""
-    session_id = str(uuid.uuid4())
+    requested_session = (request.session_id or "").strip()
+    session_id = requested_session or str(uuid.uuid4())
 
     category = (request.category or "electronics").strip().lower()
     country = (request.country or "US").strip().upper()
@@ -627,12 +628,19 @@ async def api_amazon_fetch(request: AmazonFetchRequest):
             country=country,
             limit=limit,
         )
-        schema = load_records_for_session(records, session_id)
+
+        do_merge = bool(request.merge_into_session and requested_session)
+        if do_merge:
+            schema = merge_records_into_session(records, session_id)
+        else:
+            schema = load_records_for_session(records, session_id)
+
         _cache_schema_context(session_id, schema)
 
         source_label = "live RapidAPI" if source_mode == "live" else "mock fallback"
+        action_label = "merged into current session" if do_merge else "loaded"
         return UploadResponse(
-            message=f"Amazon '{category}' dataset loaded ({source_label})",
+            message=f"Amazon '{category}' dataset {action_label} ({source_label})",
             columns=[col.name for col in schema.columns],
             row_count=schema.row_count,
             session_id=session_id,

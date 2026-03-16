@@ -142,7 +142,14 @@ export default function Home() {
   const handleFetchAmazon = useCallback(async (category: string) => {
     setIsLoading(true);
     try {
-      const info = await fetchAmazonData(category, "US", 20);
+      const shouldMerge = Boolean(uploadInfo?.session_id || sessionId);
+      const info = await fetchAmazonData(
+        category,
+        "US",
+        20,
+        shouldMerge ? sessionId : undefined,
+        shouldMerge,
+      );
       setUploadInfo(info);
       setSessionId(info.session_id);
       setMessages([]);
@@ -154,7 +161,7 @@ export default function Home() {
       const systemMessage: ChatMessage = {
         id: uuidv4(),
         role: "assistant",
-        content: `✅ ${info.message}! Loaded ${info.row_count.toLocaleString()} rows with ${info.columns.length} columns${sourceHint}. Try asking: 'Show top products by review count', 'Compare average price by category', or 'Compare categories by average rating'.`,
+        content: `✅ ${info.message}! Loaded ${info.row_count.toLocaleString()} rows with ${info.columns.length} columns${sourceHint}. Try asking: 'Compare average price by data_source', 'Compare categories by average rating', or 'Top products by review_count across sources'.`,
         timestamp: new Date(),
       };
       setMessages([systemMessage]);
@@ -173,7 +180,7 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [sessionId, uploadInfo]);
 
   const handleNewSession = useCallback(() => {
     setSessionId(uuidv4());

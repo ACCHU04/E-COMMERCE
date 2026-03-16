@@ -45,6 +45,51 @@ def load_records_for_session(records: list[dict[str, Any]], session_id: str) -> 
     return get_schema(session_id)
 
 
+def merge_records_into_session(records: list[dict[str, Any]], session_id: str) -> SchemaResponse:
+    """Merge API-fetched records with existing session data for cross-source comparisons."""
+    if not records:
+        raise ValueError("No records were returned from the selected data source")
+
+    incoming_df = pd.DataFrame(records)
+    if incoming_df.empty:
+        raise ValueError("Fetched dataset is empty")
+
+    # Target a session DB (never mutate the default base DB directly).
+    if session_id in _session_dbs:
+        db_path = _session_dbs[session_id]
+        existing_db_path = db_path
+    else:
+        db_path = f"session_{session_id}.db"
+        existing_db_path = settings.db_path
+
+    existing_df = pd.DataFrame()
+    try:
+        conn_existing = sqlite3.connect(existing_db_path)
+        existing_df = pd.read_sql_query("SELECT * FROM sales_data", conn_existing)
+    except Exception:
+        existing_df = pd.DataFrame()
+    finally:
+        try:
+            conn_existing.close()
+        except Exception:
+            pass
+
+    # Normalize columns before union so both datasets align safely.
+    incoming_df.columns = [c.strip().lower().replace(" ", "_") for c in incoming_df.columns]
+    if not existing_df.empty:
+        existing_df.columns = [c.strip().lower().replace(" ", "_") for c in existing_df.columns]
+        if "data_source" not in existing_df.columns:
+            existing_df["data_source"] = "uploaded"
+
+    if "data_source" not in incoming_df.columns:
+        incoming_df["data_source"] = "amazon_api"
+
+    merged_df = pd.concat([existing_df, incoming_df], ignore_index=True, sort=False)
+    _load_dataframe_to_db(merged_df, db_path, "sales_data")
+    _session_dbs[session_id] = db_path
+    return get_schema(session_id)
+
+
 def _load_csv_to_db(csv_path: str, db_path: str, table_name: str) -> None:
     """Load CSV/JSON/XLSX file into a SQLite database table."""
     df = _read_table_with_fallbacks(csv_path)
