@@ -28,9 +28,17 @@ export async function getSchema(sessionId?: string): Promise<SchemaResponse> {
   return data;
 }
 
-export async function uploadCSV(file: File): Promise<UploadResponse> {
+export async function uploadCSV(
+  file: File,
+  sessionId?: string,
+  mergeIntoSession = false,
+): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
+  if (sessionId) {
+    formData.append("session_id", sessionId);
+  }
+  formData.append("merge_into_session", String(mergeIntoSession));
   const { data } = await axios.post<UploadResponse>(
     `${API_BASE}/api/upload`,
     formData,

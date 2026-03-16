@@ -33,6 +33,47 @@ def load_csv_for_session(csv_path: str, session_id: str) -> SchemaResponse:
     return get_schema(session_id)
 
 
+def merge_csv_into_session(csv_path: str, session_id: str) -> SchemaResponse:
+    """Merge an uploaded file into an existing session dataset for cross-source analysis."""
+    incoming_df = _read_table_with_fallbacks(csv_path)
+    if incoming_df.empty:
+        raise ValueError("Dataset is empty")
+
+    # Target a session DB (never mutate the default base DB directly).
+    if session_id in _session_dbs:
+        db_path = _session_dbs[session_id]
+        existing_db_path = db_path
+    else:
+        db_path = f"session_{session_id}.db"
+        existing_db_path = settings.db_path
+
+    existing_df = pd.DataFrame()
+    try:
+        conn_existing = sqlite3.connect(existing_db_path)
+        existing_df = pd.read_sql_query("SELECT * FROM sales_data", conn_existing)
+    except Exception:
+        existing_df = pd.DataFrame()
+    finally:
+        try:
+            conn_existing.close()
+        except Exception:
+            pass
+
+    incoming_df.columns = [c.strip().lower().replace(" ", "_") for c in incoming_df.columns]
+    if "data_source" not in incoming_df.columns:
+        incoming_df["data_source"] = "uploaded"
+
+    if not existing_df.empty:
+        existing_df.columns = [c.strip().lower().replace(" ", "_") for c in existing_df.columns]
+        if "data_source" not in existing_df.columns:
+            existing_df["data_source"] = "uploaded"
+
+    merged_df = pd.concat([existing_df, incoming_df], ignore_index=True, sort=False)
+    _load_dataframe_to_db(merged_df, db_path, "sales_data")
+    _session_dbs[session_id] = db_path
+    return get_schema(session_id)
+
+
 def load_records_for_session(records: list[dict[str, Any]], session_id: str) -> SchemaResponse:
     """Load API-fetched records into a session-specific SQLite database."""
     if not records:

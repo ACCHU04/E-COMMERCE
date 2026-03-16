@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Dashboard } from "@/components/Dashboard";
@@ -30,8 +30,10 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [uploadInfo, setUploadInfo] = useState<UploadResponse | null>(null);
   const [queryHistory, setQueryHistory] = useState<string[]>([]);
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     try {
@@ -110,7 +112,12 @@ export default function Home() {
   const handleUpload = useCallback(async (file: File) => {
     setIsLoading(true);
     try {
-      const info = await uploadCSV(file);
+      const shouldMerge = Boolean(uploadInfo?.session_id);
+      const info = await uploadCSV(
+        file,
+        shouldMerge ? sessionId : undefined,
+        shouldMerge,
+      );
       setUploadInfo(info);
       setSessionId(info.session_id);
       setMessages([]);
@@ -118,7 +125,7 @@ export default function Home() {
       const systemMessage: ChatMessage = {
         id: uuidv4(),
         role: "assistant",
-        content: `✅ Dataset "${file.name}" loaded successfully! Found ${info.row_count.toLocaleString()} rows with ${info.columns.length} columns: ${info.columns.join(", ")}. You can now ask questions about this data.`,
+        content: `✅ ${info.message}! Found ${info.row_count.toLocaleString()} rows with ${info.columns.length} columns: ${info.columns.join(", ")}. You can now ask questions about this data.`,
         timestamp: new Date(),
       };
       setMessages([systemMessage]);
@@ -285,21 +292,42 @@ export default function Home() {
       const margin = 20;
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
+      const headerHeight = 42;
+      const imageStartY = margin + headerHeight;
       const usableWidth = pageWidth - margin * 2;
-      const usableHeight = pageHeight - margin * 2;
+      const usableHeight = pageHeight - imageStartY - margin;
+
+      const reportDate = new Date(`${selectedDate}T00:00:00`).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+      const generatedAt = new Date().toLocaleString();
+
+      const drawHeader = () => {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(12);
+        pdf.text("AI Dashboard Export", margin, margin + 10);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.text(`Selected Date: ${reportDate}`, margin, margin + 24);
+        pdf.text(`Generated At: ${generatedAt}`, margin, margin + 35);
+      };
 
       const imageWidth = usableWidth;
       const imageHeight = (canvas.height * imageWidth) / canvas.width;
 
       let heightLeft = imageHeight;
-      let positionY = margin;
+      let positionY = imageStartY;
 
+      drawHeader();
       pdf.addImage(imageData, "PNG", margin, positionY, imageWidth, imageHeight, undefined, "FAST");
       heightLeft -= usableHeight;
 
       while (heightLeft > 0) {
-        positionY = heightLeft - imageHeight + margin;
+        positionY = imageStartY - (imageHeight - heightLeft);
         pdf.addPage();
+        drawHeader();
         pdf.addImage(imageData, "PNG", margin, positionY, imageWidth, imageHeight, undefined, "FAST");
         heightLeft -= usableHeight;
       }
@@ -312,7 +340,28 @@ export default function Home() {
       exportNode.classList.remove("pdf-exporting");
       setIsExportingPdf(false);
     }
+  }, [selectedDate]);
+
+  const openDatePicker = useCallback(() => {
+    const input = dateInputRef.current;
+    if (!input) return;
+
+    if (typeof (input as HTMLInputElement & { showPicker?: () => void }).showPicker === "function") {
+      (input as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+      return;
+    }
+
+    input.click();
   }, []);
+
+  const formattedSelectedDate = useMemo(
+    () => new Date(`${selectedDate}T00:00:00`).toLocaleDateString(undefined, {
+      month: "short",
+      year: "numeric",
+      day: "numeric",
+    }),
+    [selectedDate]
+  );
 
   const exportSessionJson = useCallback(() => {
     const payload = {
@@ -391,10 +440,23 @@ export default function Home() {
               <Sparkles className="w-3 h-3 text-violet-300" />
               {uploadInfo ? `Custom: ${uploadInfo.columns.length} columns` : "Amazon Sales Data"}
             </span>
-            <span className="hidden md:flex items-center gap-1.5 text-xs soft-pill rounded-full px-3 py-1.5">
+            <button
+              type="button"
+              onClick={openDatePicker}
+              className="hidden md:flex items-center gap-1.5 text-xs soft-pill rounded-full px-3 py-1.5 hover:bg-slate-800/60 transition-colors"
+              title="Select report date"
+            >
               <CalendarDays className="w-3 h-3" />
-              Mar 2026
-            </span>
+              {formattedSelectedDate}
+            </button>
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="sr-only"
+              aria-label="Select report date"
+            />
             <button
               onClick={handleExportPdf}
               disabled={isExportingPdf}

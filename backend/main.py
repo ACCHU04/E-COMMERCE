@@ -2,12 +2,12 @@ import os
 import re
 import uuid
 import tempfile
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from models import AmazonFetchRequest, QueryRequest, QueryResponse, SchemaResponse, UploadResponse, ChartData, QueryPlan, ExecutiveSummary
-from database import init_default_db, execute_query, get_schema, load_csv_for_session, load_records_for_session, merge_records_into_session, get_dataset_profile
+from database import init_default_db, execute_query, get_schema, load_csv_for_session, merge_csv_into_session, load_records_for_session, merge_records_into_session, get_dataset_profile
 from llm_service import generate_dashboard, repair_sql_query, DEFAULT_SCHEMA_CONTEXT
 from query_parser import validate_sql, validate_sql_columns, clean_sql
 from chart_recommender import recommend_chart
@@ -572,7 +572,11 @@ async def api_query(request: QueryRequest):
 
 
 @app.post("/api/upload", response_model=UploadResponse)
-async def api_upload(file: UploadFile = File(...)):
+async def api_upload(
+    file: UploadFile = File(...),
+    session_id: str | None = Form(default=None),
+    merge_into_session: str | None = Form(default="false"),
+):
     """Upload a CSV file and create a new session for it."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="A file is required")
@@ -582,7 +586,9 @@ async def api_upload(file: UploadFile = File(...)):
     if not lowered_name.endswith(allowed_ext):
         raise HTTPException(status_code=400, detail="Supported file types: CSV, JSON, XLSX")
 
-    session_id = str(uuid.uuid4())
+    requested_session = (session_id or "").strip()
+    active_session_id = requested_session or str(uuid.uuid4())
+    merge_requested = str(merge_into_session or "false").strip().lower() in {"1", "true", "yes", "on"}
 
     # Save uploaded file temporarily
     extension = os.path.splitext(file.filename)[1] or ".csv"
@@ -592,17 +598,24 @@ async def api_upload(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        schema = load_csv_for_session(tmp_path, session_id)
-        _cache_schema_context(session_id, schema)
+        do_merge = bool(merge_requested and requested_session)
+        if do_merge:
+            schema = merge_csv_into_session(tmp_path, active_session_id)
+        else:
+            schema = load_csv_for_session(tmp_path, active_session_id)
+
+        _cache_schema_context(active_session_id, schema)
+
+        action_label = "merged into current session" if do_merge else "loaded successfully"
 
         return UploadResponse(
-            message=f"Dataset '{file.filename}' loaded successfully",
+            message=f"Dataset '{file.filename}' {action_label}",
             columns=[col.name for col in schema.columns],
             row_count=schema.row_count,
-            session_id=session_id,
+            session_id=active_session_id,
             source_mode="uploaded",
             schema_info=schema.columns,
-            dataset_profile=get_dataset_profile(session_id),
+            dataset_profile=get_dataset_profile(active_session_id),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
