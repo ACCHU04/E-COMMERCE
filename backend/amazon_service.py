@@ -20,6 +20,15 @@ _MOCK_PRODUCTS = [
     {"title": "Roku Streaming Stick 4K", "price": 49.99, "rating": 4.6, "review_count": 87231, "is_prime": True, "asin": "B09BKCDXZC"},
 ]
 
+_SUPPORTED_CATEGORIES = [
+    "electronics",
+    "books",
+    "fashion",
+    "home",
+    "beauty",
+    "sports",
+]
+
 
 def _to_float(value: Any, default: float = 0.0) -> float:
     if value is None:
@@ -53,11 +62,16 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def _normalize_products(items: list[dict[str, Any]], category: str, country: str) -> list[dict[str, Any]]:
+def _normalize_products(
+    items: list[dict[str, Any]],
+    category: str,
+    country: str,
+    start_index: int = 1,
+) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     today = datetime.utcnow().strftime("%Y-%m-%d")
 
-    for idx, item in enumerate(items, 1):
+    for idx, item in enumerate(items, start_index):
         title = item.get("product_title") or item.get("title") or item.get("name") or f"Amazon Product {idx}"
         price = _to_float(item.get("product_price") or item.get("price") or item.get("current_price"), 0.0)
         rating = _to_float(item.get("product_star_rating") or item.get("rating"), 0.0)
@@ -92,43 +106,110 @@ def _normalize_products(items: list[dict[str, Any]], category: str, country: str
     return normalized
 
 
-async def fetch_amazon_best_sellers(category: str = "electronics", country: str = "US", limit: int = 20) -> tuple[list[dict[str, Any]], str]:
-    """Fetch best-seller products and normalize them into dashboard-friendly rows."""
-    capped_limit = max(5, min(limit, 50))
+def _mock_rows_for_category(category: str, country: str, limit: int, start_index: int = 1) -> list[dict[str, Any]]:
+    if category == "all":
+        mixed_products: list[dict[str, Any]] = []
+        per_category = max(2, limit // len(_SUPPORTED_CATEGORIES))
+        for cat in _SUPPORTED_CATEGORIES:
+            for item in _MOCK_PRODUCTS[:per_category]:
+                mixed_products.append({
+                    **item,
+                    "title": f"{item['title']} ({cat})",
+                })
+                if len(mixed_products) >= limit:
+                    break
+            if len(mixed_products) >= limit:
+                break
+        return _normalize_products(mixed_products[:limit], category="mixed", country=country, start_index=start_index)
 
-    if not settings.rapidapi_key:
-        mock_rows = _normalize_products(_MOCK_PRODUCTS[:capped_limit], category, country)
-        return mock_rows, "mock"
+    return _normalize_products(_MOCK_PRODUCTS[:limit], category, country, start_index=start_index)
 
+
+async def _fetch_single_category(
+    client: httpx.AsyncClient,
+    headers: dict[str, str],
+    category: str,
+    country: str,
+    limit: int,
+    start_index: int = 1,
+) -> list[dict[str, Any]]:
     url = f"{settings.rapidapi_base_url}/best-sellers"
-    headers = {
-        "X-RapidAPI-Key": settings.rapidapi_key,
-        "X-RapidAPI-Host": settings.rapidapi_host,
-    }
     params = {
         "category": category,
         "country": country,
         "page": "1",
     }
 
+    resp = await client.get(url, headers=headers, params=params)
+    resp.raise_for_status()
+    payload = resp.json()
+
+    data = payload.get("data", {}) if isinstance(payload, dict) else {}
+    products = data.get("best_sellers") or data.get("products") or []
+
+    if not isinstance(products, list) or not products:
+        return []
+
+    return _normalize_products(products[:limit], category, country, start_index=start_index)
+
+
+async def fetch_amazon_best_sellers(category: str = "electronics", country: str = "US", limit: int = 20) -> tuple[list[dict[str, Any]], str]:
+    """Fetch best-seller products and normalize them into dashboard-friendly rows."""
+    capped_limit = max(5, min(limit, 50))
+
+    normalized_category = (category or "electronics").strip().lower()
+
+    if not settings.rapidapi_key:
+        mock_rows = _mock_rows_for_category(normalized_category, country, capped_limit)
+        return mock_rows, "mock"
+
+    headers = {
+        "X-RapidAPI-Key": settings.rapidapi_key,
+        "X-RapidAPI-Host": settings.rapidapi_host,
+    }
+
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.get(url, headers=headers, params=params)
-            resp.raise_for_status()
-            payload = resp.json()
+            if normalized_category == "all":
+                all_rows: list[dict[str, Any]] = []
+                per_category = max(3, capped_limit // len(_SUPPORTED_CATEGORIES))
+                row_index = 1
+                for cat in _SUPPORTED_CATEGORIES:
+                    try:
+                        rows = await _fetch_single_category(
+                            client,
+                            headers,
+                            category=cat,
+                            country=country,
+                            limit=per_category,
+                            start_index=row_index,
+                        )
+                    except Exception:
+                        rows = []
 
-        data = payload.get("data", {}) if isinstance(payload, dict) else {}
-        products = data.get("best_sellers") or data.get("products") or []
+                    if rows:
+                        all_rows.extend(rows)
+                        row_index += len(rows)
 
-        if not isinstance(products, list) or not products:
-            raise ValueError("RapidAPI returned an empty product list")
+                    if len(all_rows) >= capped_limit:
+                        break
 
-        normalized = _normalize_products(products[:capped_limit], category, country)
+                normalized = all_rows[:capped_limit]
+            else:
+                normalized = await _fetch_single_category(
+                    client,
+                    headers,
+                    category=normalized_category,
+                    country=country,
+                    limit=capped_limit,
+                    start_index=1,
+                )
+
         if not normalized:
             raise ValueError("RapidAPI response could not be normalized")
 
         return normalized, "live"
     except Exception:
         # Demo-safe fallback so the product keeps working even if API quota is exhausted.
-        mock_rows = _normalize_products(_MOCK_PRODUCTS[:capped_limit], category, country)
+        mock_rows = _mock_rows_for_category(normalized_category, country, capped_limit)
         return mock_rows, "mock"

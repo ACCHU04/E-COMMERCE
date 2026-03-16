@@ -154,7 +154,7 @@ export default function Home() {
       const systemMessage: ChatMessage = {
         id: uuidv4(),
         role: "assistant",
-        content: `✅ ${info.message}! Loaded ${info.row_count.toLocaleString()} rows with ${info.columns.length} columns${sourceHint}. Try asking: 'Show top products by review count' or 'Compare average price by category'.`,
+        content: `✅ ${info.message}! Loaded ${info.row_count.toLocaleString()} rows with ${info.columns.length} columns${sourceHint}. Try asking: 'Show top products by review count', 'Compare average price by category', or 'Compare categories by average rating'.`,
         timestamp: new Date(),
       };
       setMessages([systemMessage]);

@@ -10,6 +10,7 @@ interface FileUploadProps {
 }
 
 const AMAZON_CATEGORIES = [
+  "all",
   "electronics",
   "books",
   "fashion",
@@ -136,7 +137,7 @@ export function FileUpload({ onUpload, onFetchAmazon, isLoading }: FileUploadPro
           >
             {AMAZON_CATEGORIES.map((category) => (
               <option key={category} value={category}>
-                {category[0].toUpperCase() + category.slice(1)}
+                {category === "all" ? "All Categories" : category[0].toUpperCase() + category.slice(1)}
               </option>
             ))}
           </select>
