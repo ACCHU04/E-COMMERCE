@@ -10,6 +10,7 @@ services:
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - RAPIDAPI_KEY=${RAPIDAPI_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - DATA_DIR=/app/data
       - DB_PATH=/app/ecommerce.db
     restart: unless-stopped
@@ -23,6 +24,7 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
       - INTERNAL_API_URL=http://backend:8000
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     depends_on:
       - backend
     restart: unless-stopped

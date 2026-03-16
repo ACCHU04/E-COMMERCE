@@ -76,6 +76,18 @@ export interface UploadResponse {
   dataset_profile: DatasetProfile | null;
 }
 
+export interface AuthUser {
+  id: number;
+  email: string;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: "bearer";
+  user: AuthUser;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";

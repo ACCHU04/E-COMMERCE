@@ -7,6 +7,32 @@ class QueryRequest(BaseModel):
     session_id: Optional[str] = None
 
 
+class AuthRegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthGoogleRequest(BaseModel):
+    id_token: str
+
+
+class AuthUser(BaseModel):
+    id: int
+    email: str
+    created_at: str
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: AuthUser
+
+
 class AmazonFetchRequest(BaseModel):
     category: str = "electronics"
     country: str = "US"

@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-flash-latest"
     gemini_fallback_models: str = "models/gemini-flash-latest,gemini-2.0-flash,models/gemini-2.0-flash,gemini-2.5-flash"
     db_path: str = "ecommerce.db"
+    auth_db_path: str = "auth_users.db"
+    auth_secret_key: str = "dev-auth-secret-change-me"
+    auth_token_exp_minutes: int = 720
+    google_client_id: str = ""
     data_dir: str = str(Path(__file__).parent.parent / "data")
     default_csv: str = "amazon_sales.csv"
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]

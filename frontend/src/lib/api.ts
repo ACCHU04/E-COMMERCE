@@ -1,5 +1,6 @@
 import axios from "axios";
-import { QueryResponse, SchemaResponse, UploadResponse } from "@/types";
+import { clearAuthUser, getAuthUser } from "@/lib/auth";
+import { AuthResponse, AuthUser, QueryResponse, SchemaResponse, UploadResponse } from "@/types";
 
 const API_BASE =
   typeof window === "undefined"
@@ -10,6 +11,48 @@ const api = axios.create({
   baseURL: API_BASE,
   headers: { "Content-Type": "application/json" },
 });
+
+api.interceptors.request.use((config) => {
+  const authUser = getAuthUser();
+  if (authUser?.token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${authUser.token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (typeof window !== "undefined" && error?.response?.status === 401) {
+      clearAuthUser();
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+export async function loginUser(email: string, password: string): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>("/api/auth/login", { email, password });
+  return data;
+}
+
+export async function registerUser(email: string, password: string): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>("/api/auth/register", { email, password });
+  return data;
+}
+
+export async function googleLoginUser(idToken: string): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>("/api/auth/google", { id_token: idToken });
+  return data;
+}
+
+export async function getCurrentUser(): Promise<AuthUser> {
+  const { data } = await api.get<AuthUser>("/api/auth/me");
+  return data;
+}
 
 export async function sendQuery(
   query: string,
@@ -39,8 +82,8 @@ export async function uploadCSV(
     formData.append("session_id", sessionId);
   }
   formData.append("merge_into_session", String(mergeIntoSession));
-  const { data } = await axios.post<UploadResponse>(
-    `${API_BASE}/api/upload`,
+  const { data } = await api.post<UploadResponse>(
+    "/api/upload",
     formData,
     { headers: { "Content-Type": "multipart/form-data" } }
   );

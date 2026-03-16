@@ -2,11 +2,13 @@ import os
 import re
 import uuid
 import tempfile
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials
 
 from config import settings
-from models import AmazonFetchRequest, QueryRequest, QueryResponse, SchemaResponse, UploadResponse, ChartData, QueryPlan, ExecutiveSummary
+from models import AmazonFetchRequest, AuthGoogleRequest, AuthLoginRequest, AuthRegisterRequest, AuthResponse, AuthUser, QueryRequest, QueryResponse, SchemaResponse, UploadResponse, ChartData, QueryPlan, ExecutiveSummary
+from auth_service import auth_scheme, authenticate_user, create_access_token, create_user, get_or_create_oauth_user, init_auth_db, require_auth, verify_google_id_token
 from database import init_default_db, execute_query, get_schema, load_csv_for_session, merge_csv_into_session, load_records_for_session, merge_records_into_session, get_dataset_profile
 from llm_service import generate_dashboard, repair_sql_query, DEFAULT_SCHEMA_CONTEXT
 from query_parser import validate_sql, validate_sql_columns, clean_sql
@@ -34,6 +36,7 @@ _conversation_history: dict[str, list[dict]] = {}
 _session_schema_context: dict[str, str] = {}
 # Keep last successful dashboard per session for follow-up command transforms
 _session_last_dashboard: dict[str, dict] = {}
+_bearer_scheme = auth_scheme()
 
 
 def _build_query_plan(intent: str, chart_strategy: list[str], assumptions: list[str], warnings: list[str]) -> QueryPlan:
@@ -318,6 +321,7 @@ Total rows: {schema.row_count}
 
 @app.on_event("startup")
 async def startup():
+    init_auth_db()
     init_default_db()
     print(f"[API] Server started. Mock mode: {settings.mock_mode}")
 
@@ -327,9 +331,47 @@ async def health():
     return {"status": "ok", "mock_mode": settings.mock_mode}
 
 
+@app.post("/api/auth/register", response_model=AuthResponse)
+async def api_auth_register(request: AuthRegisterRequest):
+    user = create_user(request.email, request.password)
+    return AuthResponse(
+        access_token=create_access_token(user),
+        user=user,
+    )
+
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+async def api_auth_login(request: AuthLoginRequest):
+    user = authenticate_user(request.email, request.password)
+    return AuthResponse(
+        access_token=create_access_token(user),
+        user=user,
+    )
+
+
+@app.post("/api/auth/google", response_model=AuthResponse)
+async def api_auth_google(request: AuthGoogleRequest):
+    payload = await verify_google_id_token(request.id_token)
+    email = str(payload.get("email", "")).strip().lower()
+    user = get_or_create_oauth_user(email)
+    return AuthResponse(
+        access_token=create_access_token(user),
+        user=user,
+    )
+
+
+@app.get("/api/auth/me", response_model=AuthUser)
+async def api_auth_me(credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme)):
+    return require_auth(credentials)
+
+
 @app.get("/api/schema", response_model=SchemaResponse)
-async def api_schema(session_id: str | None = None):
+async def api_schema(
+    session_id: str | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+):
     """Get the schema of the current dataset."""
+    require_auth(credentials)
     try:
         return get_schema(session_id)
     except Exception as e:
@@ -337,8 +379,12 @@ async def api_schema(session_id: str | None = None):
 
 
 @app.post("/api/query", response_model=QueryResponse)
-async def api_query(request: QueryRequest):
+async def api_query(
+    request: QueryRequest,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+):
     """Process a natural language query and return dashboard charts."""
+    require_auth(credentials)
     session_id = request.session_id or str(uuid.uuid4())
 
     # Get conversation history for this session
@@ -576,8 +622,10 @@ async def api_upload(
     file: UploadFile = File(...),
     session_id: str | None = Form(default=None),
     merge_into_session: str | None = Form(default="false"),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
 ):
     """Upload a CSV file and create a new session for it."""
+    require_auth(credentials)
     if not file.filename:
         raise HTTPException(status_code=400, detail="A file is required")
 
@@ -626,8 +674,12 @@ async def api_upload(
 
 
 @app.post("/api/amazon/fetch", response_model=UploadResponse)
-async def api_amazon_fetch(request: AmazonFetchRequest):
+async def api_amazon_fetch(
+    request: AmazonFetchRequest,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+):
     """Fetch Amazon best-seller data via RapidAPI (or mock fallback) and load it as a session dataset."""
+    require_auth(credentials)
     requested_session = (request.session_id or "").strip()
     session_id = requested_session or str(uuid.uuid4())
 

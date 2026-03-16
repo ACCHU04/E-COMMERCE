@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Dashboard } from "@/components/Dashboard";
 import { FileUpload } from "@/components/FileUpload";
+import { clearAuthUser, getAuthUser } from "@/lib/auth";
 import { fetchAmazonData, sendQuery, uploadCSV } from "@/lib/api";
 import { ChatMessage, UploadResponse } from "@/types";
 import {
@@ -17,6 +19,7 @@ import {
   LayoutDashboard,
   Loader2,
   LineChart,
+  LogOut,
   Plus,
   Search,
   Settings,
@@ -26,6 +29,8 @@ import {
 type ViewKey = "overview" | "analytics" | "reports" | "history" | "settings";
 
 export default function Home() {
+  const router = useRouter();
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [sessionId, setSessionId] = useState<string>(uuidv4());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +39,15 @@ export default function Home() {
   const [uploadInfo, setUploadInfo] = useState<UploadResponse | null>(null);
   const [queryHistory, setQueryHistory] = useState<string[]>([]);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const authUser = getAuthUser();
+    if (!authUser) {
+      router.replace("/login");
+      return;
+    }
+    setIsAuthReady(true);
+  }, [router]);
 
   useEffect(() => {
     try {
@@ -382,6 +396,19 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }, [messages, queryHistory, sessionId]);
 
+  const handleLogout = useCallback(() => {
+    clearAuthUser();
+    router.replace("/login");
+  }, [router]);
+
+  if (!isAuthReady) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="glass-panel px-6 py-4 text-sm text-slate-300">Verifying session...</div>
+      </main>
+    );
+  }
+
   return (
     <div className="app-shell">
       <aside className="left-rail py-4 px-2 flex flex-col items-center gap-2">
@@ -411,10 +438,11 @@ export default function Home() {
         <div className="flex-1" />
         <button
           type="button"
-          title="Profile"
-          className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 text-white text-xs font-bold shadow-[0_0_16px_rgba(124,58,237,0.38)]"
+          onClick={handleLogout}
+          title="Logout"
+          className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-cyan-500 text-white shadow-[0_0_16px_rgba(124,58,237,0.38)] inline-flex items-center justify-center"
         >
-          A
+          <LogOut className="w-4 h-4" />
         </button>
       </aside>
 
