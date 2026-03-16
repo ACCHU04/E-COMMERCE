@@ -12,6 +12,7 @@ Turn natural-language questions into interactive dashboards, insights, and expor
 - Query planning + confidence indicators
 - Executive summary cards for decision-making
 - Upload support for CSV, JSON, XLSX/XLS
+- Amazon best-seller fetch (RapidAPI) with safe mock fallback
 - Session-aware query history and replay
 - Multi-view frontend workspace (Overview, Analytics, Reports, History, Settings)
 - Real PDF export from dashboard views (jsPDF + html2canvas)
@@ -79,6 +80,7 @@ Backend: http://localhost:8000/docs
 ### Backend
 
 - `GEMINI_API_KEY` (optional but recommended)
+- `RAPIDAPI_KEY` (optional, enables live Amazon API fetch)
 - `DB_PATH` (optional)
 - `DATA_DIR` (optional)
 - `DEFAULT_CSV` (optional)
@@ -161,6 +163,21 @@ Response includes dataset profile metadata:
 - `row_count`
 - `dataset_profile`
 - `session_id`
+
+### POST `/api/amazon/fetch`
+
+Request:
+
+```json
+{
+  "category": "electronics",
+  "country": "US",
+  "limit": 20
+}
+```
+
+Loads Amazon best-seller data into a new analysis session.
+If `RAPIDAPI_KEY` is not configured (or quota is exhausted), the backend automatically falls back to mock Amazon data for uninterrupted demos.
 
 ## Frontend UI Notes (Current)
 

@@ -38,3 +38,16 @@ export async function uploadCSV(file: File): Promise<UploadResponse> {
   );
   return data;
 }
+
+export async function fetchAmazonData(
+  category: string,
+  country = "US",
+  limit = 20
+): Promise<UploadResponse> {
+  const { data } = await api.post<UploadResponse>("/api/amazon/fetch", {
+    category,
+    country,
+    limit,
+  });
+  return data;
+}

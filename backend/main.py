@@ -6,11 +6,12 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from models import QueryRequest, QueryResponse, SchemaResponse, UploadResponse, ChartData, QueryPlan, ExecutiveSummary
-from database import init_default_db, execute_query, get_schema, load_csv_for_session, get_dataset_profile
+from models import AmazonFetchRequest, QueryRequest, QueryResponse, SchemaResponse, UploadResponse, ChartData, QueryPlan, ExecutiveSummary
+from database import init_default_db, execute_query, get_schema, load_csv_for_session, load_records_for_session, get_dataset_profile
 from llm_service import generate_dashboard, repair_sql_query, DEFAULT_SCHEMA_CONTEXT
 from query_parser import validate_sql, validate_sql_columns, clean_sql
 from chart_recommender import recommend_chart
+from amazon_service import fetch_amazon_best_sellers
 
 app = FastAPI(
     title="E-Commerce BI Dashboard API",
@@ -57,7 +58,18 @@ def _detect_clarification_need(user_query: str) -> tuple[bool, str | None, list[
         )
 
     asks_top = any(token in q for token in ["top", "best", "highest", "top-performing"])
-    has_metric = any(token in q for token in ["revenue", "sales", "profit", "rating", "quantity", "discount"])
+    has_metric = any(token in q for token in [
+        "revenue",
+        "sales",
+        "profit",
+        "rating",
+        "quantity",
+        "discount",
+        "review",
+        "reviews",
+        "review count",
+        "price",
+    ])
     if asks_top and not has_metric:
         return (
             True,
@@ -285,6 +297,23 @@ def _expand_chart_recommendations(charts: list[ChartData], max_total: int = 6) -
                 return expanded
 
     return expanded
+
+
+def _cache_schema_context(session_id: str, schema: SchemaResponse) -> None:
+    col_descriptions = "\n".join([
+        f"- {col.name} ({col.type}): sample values: {', '.join(str(v) for v in col.sample_values[:3])}"
+        for col in schema.columns
+    ])
+    sample_rows_json = schema.sample_data[:3]
+    schema_context = f"""
+Table name: sales_data
+Columns:
+{col_descriptions}
+
+Total rows: {schema.row_count}
+    Sample rows (first 3): {sample_rows_json}
+"""
+    _session_schema_context[session_id] = schema_context
 
 
 @app.on_event("startup")
@@ -564,22 +593,7 @@ async def api_upload(file: UploadFile = File(...)):
 
     try:
         schema = load_csv_for_session(tmp_path, session_id)
-
-        # Build schema context string for LLM
-        col_descriptions = "\n".join([
-            f"- {col.name} ({col.type}): sample values: {', '.join(str(v) for v in col.sample_values[:3])}"
-            for col in schema.columns
-        ])
-        sample_rows_json = schema.sample_data[:3]
-        schema_context = f"""
-Table name: sales_data
-Columns:
-{col_descriptions}
-
-Total rows: {schema.row_count}
-    Sample rows (first 3): {sample_rows_json}
-"""
-        _session_schema_context[session_id] = schema_context
+        _cache_schema_context(session_id, schema)
 
         return UploadResponse(
             message=f"Dataset '{file.filename}' loaded successfully",
@@ -595,3 +609,36 @@ Total rows: {schema.row_count}
         raise HTTPException(status_code=500, detail="Failed to process CSV file")
     finally:
         os.unlink(tmp_path)
+
+
+@app.post("/api/amazon/fetch", response_model=UploadResponse)
+async def api_amazon_fetch(request: AmazonFetchRequest):
+    """Fetch Amazon best-seller data via RapidAPI (or mock fallback) and load it as a session dataset."""
+    session_id = str(uuid.uuid4())
+
+    category = (request.category or "electronics").strip().lower()
+    country = (request.country or "US").strip().upper()
+    limit = max(5, min(int(request.limit or 20), 50))
+
+    try:
+        records, source_mode = await fetch_amazon_best_sellers(
+            category=category,
+            country=country,
+            limit=limit,
+        )
+        schema = load_records_for_session(records, session_id)
+        _cache_schema_context(session_id, schema)
+
+        source_label = "live RapidAPI" if source_mode == "live" else "mock fallback"
+        return UploadResponse(
+            message=f"Amazon '{category}' dataset loaded ({source_label})",
+            columns=[col.name for col in schema.columns],
+            row_count=schema.row_count,
+            session_id=session_id,
+            schema_info=schema.columns,
+            dataset_profile=get_dataset_profile(session_id),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch Amazon data: {str(e)}")

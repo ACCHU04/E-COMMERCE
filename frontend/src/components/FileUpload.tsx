@@ -5,12 +5,23 @@ import { Upload, X, FileText, CheckCircle } from "lucide-react";
 
 interface FileUploadProps {
   onUpload: (file: File) => void;
+  onFetchAmazon: (category: string) => void;
   isLoading: boolean;
 }
 
-export function FileUpload({ onUpload, isLoading }: FileUploadProps) {
+const AMAZON_CATEGORIES = [
+  "electronics",
+  "books",
+  "fashion",
+  "home",
+  "beauty",
+  "sports",
+];
+
+export function FileUpload({ onUpload, onFetchAmazon, isLoading }: FileUploadProps) {
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [amazonCategory, setAmazonCategory] = useState("electronics");
 
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
@@ -38,6 +49,11 @@ export function FileUpload({ onUpload, isLoading }: FileUploadProps) {
   const handleClear = useCallback(() => {
     setSelectedFile(null);
   }, []);
+
+  const handleAmazonFetch = useCallback(() => {
+    if (isLoading) return;
+    onFetchAmazon(amazonCategory);
+  }, [amazonCategory, isLoading, onFetchAmazon]);
 
   return (
     <div className="glass-panel p-4">
@@ -107,6 +123,33 @@ export function FileUpload({ onUpload, isLoading }: FileUploadProps) {
           )}
         </button>
       )}
+
+      <div className="mt-4 pt-3 border-t border-white/10 space-y-2">
+        <p className="text-xs text-slate-300">Or fetch live Amazon best-seller data</p>
+        <div className="flex items-center gap-2">
+          <select
+            value={amazonCategory}
+            onChange={(e) => setAmazonCategory(e.target.value)}
+            className="flex-1 bg-slate-900/80 border border-white/10 rounded-md px-2 py-1.5 text-xs text-slate-200"
+            aria-label="Amazon category"
+            title="Amazon category"
+          >
+            {AMAZON_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category[0].toUpperCase() + category.slice(1)}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleAmazonFetch}
+            disabled={isLoading}
+            className="px-3 py-1.5 text-xs rounded-md bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white transition-colors"
+          >
+            {isLoading ? "Fetching..." : "Fetch Amazon"}
+          </button>
+        </div>
+        <p className="text-[11px] text-slate-500">Uses RapidAPI key if configured; otherwise safe mock fallback is used.</p>
+      </div>
     </div>
   );
 }

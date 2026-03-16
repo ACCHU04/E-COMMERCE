@@ -7,6 +7,12 @@ class QueryRequest(BaseModel):
     session_id: Optional[str] = None
 
 
+class AmazonFetchRequest(BaseModel):
+    category: str = "electronics"
+    country: str = "US"
+    limit: int = 20
+
+
 class ColumnInfo(BaseModel):
     name: str
     type: str

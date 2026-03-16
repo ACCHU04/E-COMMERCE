@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ChatInterface } from "@/components/ChatInterface";
 import { Dashboard } from "@/components/Dashboard";
 import { FileUpload } from "@/components/FileUpload";
-import { sendQuery, uploadCSV } from "@/lib/api";
+import { fetchAmazonData, sendQuery, uploadCSV } from "@/lib/api";
 import { ChatMessage, UploadResponse } from "@/types";
 import {
   Activity,
@@ -132,6 +132,42 @@ export default function Home() {
           : "Failed to upload the dataset. Supported formats: CSV, JSON, XLSX.",
         timestamp: new Date(),
         error: "Upload error",
+      };
+      setMessages([errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const handleFetchAmazon = useCallback(async (category: string) => {
+    setIsLoading(true);
+    try {
+      const info = await fetchAmazonData(category, "US", 20);
+      setUploadInfo(info);
+      setSessionId(info.session_id);
+      setMessages([]);
+
+      const sourceHint = /mock/i.test(info.message)
+        ? " (using mock fallback because RapidAPI key/quota is unavailable)"
+        : "";
+
+      const systemMessage: ChatMessage = {
+        id: uuidv4(),
+        role: "assistant",
+        content: `✅ ${info.message}! Loaded ${info.row_count.toLocaleString()} rows with ${info.columns.length} columns${sourceHint}. Try asking: 'Show top products by review count' or 'Compare average price by category'.`,
+        timestamp: new Date(),
+      };
+      setMessages([systemMessage]);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      const errorMessage: ChatMessage = {
+        id: uuidv4(),
+        role: "assistant",
+        content: detail
+          ? `Amazon fetch failed: ${detail}`
+          : "Failed to fetch Amazon data. Please try again.",
+        timestamp: new Date(),
+        error: "Amazon fetch error",
       };
       setMessages([errorMessage]);
     } finally {
@@ -346,7 +382,7 @@ export default function Home() {
           {activeView === "overview" && (
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
               <section className="xl:col-span-4 2xl:col-span-3 flex flex-col gap-4 flow-fade">
-                <FileUpload onUpload={handleUpload} isLoading={isLoading} />
+                <FileUpload onUpload={handleUpload} onFetchAmazon={handleFetchAmazon} isLoading={isLoading} />
                 {uploadInfo?.dataset_profile && (
                   <div className="glass-panel p-4 space-y-2">
                     <p className="text-sm font-semibold text-slate-100">Dataset Profile</p>

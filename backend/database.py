@@ -33,11 +33,28 @@ def load_csv_for_session(csv_path: str, session_id: str) -> SchemaResponse:
     return get_schema(session_id)
 
 
+def load_records_for_session(records: list[dict[str, Any]], session_id: str) -> SchemaResponse:
+    """Load API-fetched records into a session-specific SQLite database."""
+    if not records:
+        raise ValueError("No records were returned from the selected data source")
+
+    df = pd.DataFrame(records)
+    db_path = f"session_{session_id}.db"
+    _load_dataframe_to_db(df, db_path, "sales_data")
+    _session_dbs[session_id] = db_path
+    return get_schema(session_id)
+
+
 def _load_csv_to_db(csv_path: str, db_path: str, table_name: str) -> None:
     """Load CSV/JSON/XLSX file into a SQLite database table."""
     df = _read_table_with_fallbacks(csv_path)
+    _load_dataframe_to_db(df, db_path, table_name)
+
+
+def _load_dataframe_to_db(df: pd.DataFrame, db_path: str, table_name: str) -> None:
+    """Load a pandas DataFrame into a SQLite database table."""
     if df.empty:
-        raise ValueError("CSV file is empty")
+        raise ValueError("Dataset is empty")
     # Normalize column names: lowercase, replace spaces with underscores
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     conn = sqlite3.connect(db_path)
