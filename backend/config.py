@@ -2,19 +2,27 @@ import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
 
+# On Vercel (and any read-only FS serverless env) SQLite must live in /tmp
+_TMP = "/tmp" if os.environ.get("VERCEL") else ""
+
 
 class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-flash-latest"
     gemini_fallback_models: str = "models/gemini-flash-latest,gemini-2.0-flash,models/gemini-2.0-flash,gemini-2.5-flash"
-    db_path: str = "ecommerce.db"
-    auth_db_path: str = "auth_users.db"
+    db_path: str = os.path.join(_TMP, "ecommerce.db") if _TMP else "ecommerce.db"
+    auth_db_path: str = os.path.join(_TMP, "auth_users.db") if _TMP else "auth_users.db"
     auth_secret_key: str = "dev-auth-secret-change-me"
     auth_token_exp_minutes: int = 720
     google_client_id: str = ""
     data_dir: str = str(Path(__file__).parent.parent / "data")
     default_csv: str = "amazon_sales.csv"
-    cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
     mock_mode: bool = False
     rapidapi_key: str = ""
     rapidapi_host: str = "real-time-amazon-data.p.rapidapi.com"
