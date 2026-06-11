@@ -1,44 +1,5 @@
 <div align="center">
-
-  <!-- 3D-style logo using SVG that works in both light/dark mode on GitHub -->
-  <svg width="600" height="130" viewBox="0 0 600 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#7c3aed"/>
-        <stop offset="50%" stop-color="#6366f1"/>
-        <stop offset="100%" stop-color="#06b6d4"/>
-      </linearGradient>
-      <linearGradient id="g2" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.25"/>
-        <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.08"/>
-      </linearGradient>
-      <filter id="shadow3d">
-        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#7c3aed" flood-opacity="0.25"/>
-      </filter>
-    </defs>
-
-    <!-- 3D isometric cube with chart bars -->
-    <g transform="translate(40, 25)" filter="url(#shadow3d)">
-      <!-- Cube faces -->
-      <polygon points="45,0 90,22 45,45 0,22" fill="url(#g1)"/>
-      <polygon points="0,22 45,45 45,87 0,64" fill="url(#g2)"/>
-      <polygon points="45,45 90,22 90,64 45,87" fill="url(#g1)" opacity="0.4"/>
-      <!-- Chart bars rising from cube -->
-      <rect x="12" y="32" width="9" height="28" rx="2" fill="#a78bfa"/>
-      <rect x="27" y="20" width="9" height="40" rx="2" fill="#818cf8"/>
-      <rect x="42" y="26" width="9" height="34" rx="2" fill="#34d399"/>
-      <rect x="57" y="12" width="9" height="48" rx="2" fill="#22d3ee"/>
-      <rect x="72" y="28" width="9" height="32" rx="2" fill="#c084fc"/>
-    </g>
-
-    <!-- Title text with dark gray for light mode compatibility -->
-    <text x="170" y="52" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="36" font-weight="800" fill="#1e293b" letter-spacing="1.5">AI DASHBOARD</text>
-    <text x="170" y="78" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="16" fill="#475569" letter-spacing="3">CONVERSATIONAL BI FOR E-COMMERCE</text>
-    <!-- Decorative underline -->
-    <rect x="170" y="90" width="280" height="3" rx="1.5" fill="url(#g1)"/>
-    <text x="170" y="115" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="13" fill="#64748b">Turn questions into dashboards · Instant insights · Export-ready</text>
-  </svg>
-
+  <img src="assets/logo.svg" alt="AI Dashboard Logo" width="600" height="130">
   <br/>
 
   <p align="center">
