@@ -1,11 +1,7 @@
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/anomalyco/opencode/main/assets/opencode-wordmark-dark.svg">
-    <img alt="Logo" src="https://www.svgrepo.com/show/511472/dashboard-2.svg" width="80" height="80">
-  </picture>
 
-  <!-- 3D-style logo built with SVG -->
-  <svg width="280" height="90" viewBox="0 0 280 90" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-top: 8px;">
+  <!-- 3D-style logo using SVG that works in both light/dark mode on GitHub -->
+  <svg width="600" height="130" viewBox="0 0 600 130" fill="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stop-color="#7c3aed"/>
@@ -13,44 +9,34 @@
         <stop offset="100%" stop-color="#06b6d4"/>
       </linearGradient>
       <linearGradient id="g2" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.3"/>
-        <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.1"/>
+        <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.08"/>
       </linearGradient>
-      <filter id="glow">
-        <feGaussianBlur stdDeviation="3" result="blur"/>
-        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
       <filter id="shadow3d">
-        <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#7c3aed" flood-opacity="0.35"/>
+        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#7c3aed" flood-opacity="0.25"/>
       </filter>
     </defs>
 
-    <!-- Background cube (3D isometric) -->
-    <g transform="translate(20, 15)" filter="url(#shadow3d)">
-      <!-- Top face -->
-      <polygon points="30,0 60,15 30,30 0,15" fill="url(#g1)" opacity="0.9"/>
-      <!-- Left face -->
-      <polygon points="0,15 30,30 30,58 0,43" fill="url(#g2)" fill-opacity="0.7"/>
-      <!-- Right face -->
-      <polygon points="30,30 60,15 60,43 30,58" fill="url(#g1)" fill-opacity="0.5"/>
-      <!-- Bar chart bars coming out of the cube -->
-      <rect x="10" y="20" width="6" height="18" rx="1" fill="#a78bfa" filter="url(#glow)" opacity="0.9"/>
-      <rect x="20" y="12" width="6" height="26" rx="1" fill="#818cf8" filter="url(#glow)" opacity="0.9"/>
-      <rect x="30" y="16" width="6" height="22" rx="1" fill="#34d399" filter="url(#glow)" opacity="0.9"/>
-      <rect x="40" y="8" width="6" height="30" rx="1" fill="#22d3ee" filter="url(#glow)" opacity="0.9"/>
-      <rect x="50" y="18" width="6" height="20" rx="1" fill="#c084fc" filter="url(#glow)" opacity="0.9"/>
-      <!-- Sparkle dots -->
-      <circle cx="15" cy="8" r="1.5" fill="#fff" opacity="0.8"/>
-      <circle cx="45" cy="4" r="1.5" fill="#fff" opacity="0.6"/>
-      <circle cx="35" cy="6" r="1" fill="#fff" opacity="0.5"/>
+    <!-- 3D isometric cube with chart bars -->
+    <g transform="translate(40, 25)" filter="url(#shadow3d)">
+      <!-- Cube faces -->
+      <polygon points="45,0 90,22 45,45 0,22" fill="url(#g1)"/>
+      <polygon points="0,22 45,45 45,87 0,64" fill="url(#g2)"/>
+      <polygon points="45,45 90,22 90,64 45,87" fill="url(#g1)" opacity="0.4"/>
+      <!-- Chart bars rising from cube -->
+      <rect x="12" y="32" width="9" height="28" rx="2" fill="#a78bfa"/>
+      <rect x="27" y="20" width="9" height="40" rx="2" fill="#818cf8"/>
+      <rect x="42" y="26" width="9" height="34" rx="2" fill="#34d399"/>
+      <rect x="57" y="12" width="9" height="48" rx="2" fill="#22d3ee"/>
+      <rect x="72" y="28" width="9" height="32" rx="2" fill="#c084fc"/>
     </g>
 
-    <!-- Text -->
-    <text x="110" y="38" font-family="'Syne','Segoe UI',system-ui,sans-serif" font-size="24" font-weight="700" fill="#f1f5f9" letter-spacing="1">AI DASHBOARD</text>
-    <text x="110" y="60" font-family="'DM Sans','Segoe UI',system-ui,sans-serif" font-size="12" fill="#94a3b8" letter-spacing="3">CONVERSATIONAL BI FOR E-COMMERCE</text>
-
-    <!-- Flowing line decoration -->
-    <path d="M110 72 C130 68, 140 78, 160 72 C180 66, 190 78, 210 72 C230 66, 240 76, 260 70" stroke="url(#g1)" stroke-width="1.5" fill="none" opacity="0.6"/>
+    <!-- Title text with dark gray for light mode compatibility -->
+    <text x="170" y="52" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="36" font-weight="800" fill="#1e293b" letter-spacing="1.5">AI DASHBOARD</text>
+    <text x="170" y="78" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="16" fill="#475569" letter-spacing="3">CONVERSATIONAL BI FOR E-COMMERCE</text>
+    <!-- Decorative underline -->
+    <rect x="170" y="90" width="280" height="3" rx="1.5" fill="url(#g1)"/>
+    <text x="170" y="115" font-family="'Segoe UI',Arial,Helvetica,sans-serif" font-size="13" fill="#64748b">Turn questions into dashboards · Instant insights · Export-ready</text>
   </svg>
 
   <br/>
